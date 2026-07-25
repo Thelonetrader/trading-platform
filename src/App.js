@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Journal from './Journal';
+import Watchlist from './Watchlist';
 
 function App() {
   const [activePage, setActivePage] = useState('dashboard');
@@ -127,7 +128,8 @@ function App() {
         <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
         {activePage === 'dashboard' && <Dashboard />}
 {activePage === 'journal' && <Journal />}
-{activePage !== 'dashboard' && activePage !== 'journal' && (
+{activePage === 'watchlist' && <Watchlist />}
+{activePage !== 'dashboard' && activePage !== 'journal' && activePage !== 'watchlist' && (
   <ComingSoon page={navItems.find(n => n.id === activePage)?.label} />
 )}
         </div>
