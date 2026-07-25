@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Journal from './Journal';
 import Watchlist from './Watchlist';
+import Portfolio from './Portfolio';
 
 function App() {
   const [activePage, setActivePage] = useState('dashboard');
@@ -129,7 +130,8 @@ function App() {
         {activePage === 'dashboard' && <Dashboard />}
 {activePage === 'journal' && <Journal />}
 {activePage === 'watchlist' && <Watchlist />}
-{activePage !== 'dashboard' && activePage !== 'journal' && activePage !== 'watchlist' && (
+{activePage === 'portfolio' && <Portfolio />}
+{activePage !== 'dashboard' && activePage !== 'journal' && activePage !== 'watchlist' && activePage !== 'portfolio' && (
   <ComingSoon page={navItems.find(n => n.id === activePage)?.label} />
 )}
         </div>
