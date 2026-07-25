@@ -20,6 +20,7 @@ const noopApi = {
   getAccountSummary: async () => [],
   getFundamentals: async () => ({ metrics: {}, fieldCount: 0, error: 'Connect via Electron' }),
   getHistoricalBars: async () => ({ bars: [], error: 'Connect via Electron' }),
+  openChartWindow: async () => ({ ok: false, error: 'Electron only' }),
   onQuote: () => () => {},
   onConnectionStatus: () => () => {},
   onOrderUpdate: () => () => {},

@@ -7,20 +7,22 @@ export function dispatchWatchlistChanged() {
   window.dispatchEvent(new Event(WATCHLIST_CHANGED_EVENT));
 }
 
-function contractEntry(ticker, exchange, currency) {
+function contractEntry(ticker, exchange, currency, primaryExch) {
   const t = (ticker || '').trim().toUpperCase();
   if (!t) return null;
-  return {
+  const entry = {
     ticker: t,
     exchange: exchange || 'SMART',
     currency: currency || 'USD',
   };
+  if (primaryExch) entry.primaryExch = primaryExch;
+  return entry;
 }
 
 function entryForTicker(ticker) {
   const sym = (ticker || '').trim().toUpperCase();
   const w = readJson('watchlist', []).find((x) => (x.ticker || '').toUpperCase() === sym);
-  return contractEntry(sym, w?.exchange, w?.currency);
+  return contractEntry(sym, w?.exchange, w?.currency, w?.primaryExch);
 }
 
 /** Union of watchlist, portfolio, terminal focus, and ad-hoc tickers (e.g. scorecard). */
@@ -32,7 +34,10 @@ export function mergeLiveSubscribeSymbols({
   const byTicker = new Map();
 
   const add = (entry) => {
-    const e = typeof entry === 'string' ? entryForTicker(entry) : contractEntry(entry.ticker, entry.exchange, entry.currency);
+    const e =
+      typeof entry === 'string'
+        ? entryForTicker(entry)
+        : contractEntry(entry.ticker, entry.exchange, entry.currency, entry.primaryExch);
     if (!e) return;
     byTicker.set(e.ticker, e);
   };

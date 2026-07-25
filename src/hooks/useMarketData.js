@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getWatchlistSymbols } from '../utils/storageStats';
+import { resolveSymbolHeuristic } from '../utils/resolveSymbolContract';
 
 const noopMarket = {
   getConfig: async () => ({ fmpApiKey: '', cacheTtlMinutes: 60 }),
@@ -11,6 +12,7 @@ const noopMarket = {
     sources: [],
     error: 'Market data requires Electron',
   }),
+  resolveSymbol: async (ticker) => resolveSymbolHeuristic(ticker),
   getNews: async () => ({ items: [], error: 'Market data requires Electron' }),
   getEarningsCalendar: async () => ({ items: [], error: 'Market data requires Electron' }),
 };
@@ -36,6 +38,8 @@ export function useMarketData() {
 
   const fetchFundamentals = useCallback((entry) => api.getFundamentals(entry), [api]);
 
+  const resolveSymbol = useCallback((ticker) => api.resolveSymbol(ticker), [api]);
+
   const fetchNews = useCallback((opts) => api.getNews(opts), [api]);
 
   const fetchEarningsCalendar = useCallback((opts) => api.getEarningsCalendar(opts), [api]);
@@ -49,6 +53,7 @@ export function useMarketData() {
     saveConfig,
     testFmp,
     fetchFundamentals,
+    resolveSymbol,
     fetchNews,
     fetchEarningsCalendar,
   };

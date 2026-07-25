@@ -70,6 +70,7 @@ function createService() {
     writeMarketConfig,
     testFmp: () => fmp.testConnection(),
     getFundamentals: mergeFundamentals,
+    resolveSymbol: (ticker) => fmp.resolveSymbol(ticker),
     getNews: (opts) => fmp.getNews(opts),
     getEarningsCalendar: (opts) => fmp.getEarningsCalendar(opts),
   };

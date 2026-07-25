@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
 import { dispatchWatchlistChanged } from './utils/liveSubscribe';
 import { displayChangePct, displayPrice, quoteForSymbol } from './utils/quoteDisplay';
+import { applyResolvedToWatchlistForm } from './utils/watchlistAutoFill';
+import { resolveSymbolForTerminal } from './utils/resolveSymbolContract';
 
 function Watchlist({ quotes = {}, onSelectSymbol }) {
   const loadStocks = () => {
@@ -10,6 +12,8 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
   };
   const [stocks, setStocks] = useState(loadStocks);
   const [showForm, setShowForm] = useState(false);
+  const [lookupBusy, setLookupBusy] = useState(false);
+  const [lookupHint, setLookupHint] = useState('');
   const [form, setForm] = useState({
     ticker: '',
     name: '',
@@ -19,6 +23,8 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
     priority: 'Medium',
     exchange: 'SMART',
     currency: 'USD',
+    primaryExch: '',
+    listingExchange: '',
     tags: '',
   });
 
@@ -26,15 +32,58 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
     setForm(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!form.ticker) return;
-    const newStocks = [{ ...form, id: Date.now(), addedDate: new Date().toISOString().split('T')[0] }, ...stocks];
-    setStocks(newStocks);
-    localStorage.setItem('watchlist', JSON.stringify(newStocks));
-    dispatchWatchlistChanged();
-    setForm({ ticker: '', name: '', sector: '', buyPrice: '', notes: '', priority: 'Medium', exchange: 'SMART', currency: 'USD', tags: '' });
-    setShowForm(false);
+    setLookupBusy(true);
+    try {
+      const resolved = await resolveSymbolForTerminal(form.ticker);
+      const enriched = applyResolvedToWatchlistForm(form, resolved);
+      const newStocks = [
+        { ...enriched, id: Date.now(), addedDate: new Date().toISOString().split('T')[0] },
+        ...stocks.filter((s) => (s.ticker || '').toUpperCase() !== enriched.ticker.toUpperCase()),
+      ];
+      setStocks(newStocks);
+      localStorage.setItem('watchlist', JSON.stringify(newStocks));
+      dispatchWatchlistChanged();
+      setForm({
+        ticker: '',
+        name: '',
+        sector: '',
+        buyPrice: '',
+        notes: '',
+        priority: 'Medium',
+        exchange: 'SMART',
+        currency: 'USD',
+        primaryExch: '',
+        listingExchange: '',
+        tags: '',
+      });
+      setShowForm(false);
+      setLookupHint('');
+    } finally {
+      setLookupBusy(false);
+    }
   };
+
+  const lookupTicker = useCallback(async (rawTicker) => {
+    const t = (rawTicker || '').trim().toUpperCase();
+    if (!t || t.length < 1) return;
+    setLookupBusy(true);
+    setLookupHint('');
+    try {
+      const resolved = await resolveSymbolForTerminal(t);
+      setForm((prev) => applyResolvedToWatchlistForm({ ...prev, ticker: t }, resolved));
+      setLookupHint(
+        resolved.source === 'fmp'
+          ? `Filled from FMP · ${resolved.exchange}/${resolved.currency}${resolved.listingExchange ? ` · ${resolved.listingExchange}` : ''}`
+          : `Filled from ticker rules · ${resolved.exchange}/${resolved.currency}`,
+      );
+    } catch {
+      setLookupHint('Lookup failed — check ticker or FMP key in Settings');
+    } finally {
+      setLookupBusy(false);
+    }
+  }, []);
 
   const handleDelete = (id) => {
     const newStocks = stocks.filter(s => s.id !== id);
@@ -136,7 +185,19 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 16 }}>
             <div>
               <label style={labelStyle}>Ticker</label>
-              <input placeholder="e.g. ULVR" value={form.ticker} onChange={e => handleChange('ticker', e.target.value.toUpperCase())} style={inputStyle} />
+              <input
+                placeholder="e.g. ULVR.L"
+                value={form.ticker}
+                onChange={(e) => handleChange('ticker', e.target.value.toUpperCase())}
+                onBlur={(e) => lookupTicker(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    lookupTicker(form.ticker);
+                  }
+                }}
+                style={inputStyle}
+              />
             </div>
             <div>
               <label style={labelStyle}>Company Name</label>
@@ -158,8 +219,8 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Target Buy Price (£)</label>
-              <input type="number" placeholder="0.00" value={form.buyPrice} onChange={e => handleChange('buyPrice', e.target.value)} style={inputStyle} />
+              <label style={labelStyle}>Target buy price</label>
+              <input type="number" placeholder="Auto from FMP if empty" value={form.buyPrice} onChange={e => handleChange('buyPrice', e.target.value)} style={inputStyle} />
             </div>
             <div>
               <label style={labelStyle}>Exchange (IB)</label>
@@ -192,7 +253,16 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
               style={{ ...inputStyle, resize: 'vertical' }}
             />
           </div>
-          <button onClick={handleAdd} style={{
+          {(lookupHint || lookupBusy) && (
+            <p style={{ margin: '0 0 12px', fontSize: 12, color: lookupBusy ? '#64748b' : '#818cf8' }}>
+              {lookupBusy ? 'Looking up symbol…' : lookupHint}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={lookupBusy || !form.ticker}
+            style={{
             padding: '10px 24px',
             background: '#6366f1',
             border: 'none',
@@ -200,7 +270,8 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
             color: '#fff',
             fontSize: 13,
             fontWeight: 600,
-            cursor: 'pointer',
+            cursor: lookupBusy || !form.ticker ? 'not-allowed' : 'pointer',
+            opacity: lookupBusy || !form.ticker ? 0.6 : 1,
           }}>
             Add to Watchlist
           </button>
@@ -294,7 +365,7 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
                 {onSelectSymbol && (
-                  <button type="button" onClick={() => onSelectSymbol(sym, { exchange: stock.exchange || 'SMART', currency: stock.currency || 'USD' })} style={{
+                  <button type="button" onClick={() => onSelectSymbol(sym)} style={{
                     padding: '4px 10px', borderRadius: 5, border: '1px solid #334155',
                     background: 'transparent', color: '#6366f1', fontSize: 11,
                     cursor: 'pointer', fontWeight: 600,

@@ -1,6 +1,7 @@
 const { getCached, setCached } = require('./cache');
 const { mapFmpToMetrics } = require('./mapFmpMetrics');
 const { scoreSentiment } = require('./sentiment');
+const { buildResolvedSymbol, contractFromTickerSuffix } = require('./resolveSymbol');
 
 /** FMP stable API (legacy /api/v3 paths deprecated for new keys). */
 const BASE = 'https://financialmodelingprep.com/stable';
@@ -125,6 +126,30 @@ class FmpClient {
         sources: [],
         error: e.message || 'FMP fundamentals failed',
       };
+    }
+  }
+
+  async resolveSymbol(ticker) {
+    const symbol = this.normalizeSymbol(ticker);
+    if (!symbol) {
+      return { symbol: '', error: 'Missing ticker', ...contractFromTickerSuffix(''), source: 'heuristic' };
+    }
+
+    const fallback = buildResolvedSymbol(symbol, null, 'heuristic');
+
+    if (!this._key()) {
+      return { ...fallback, error: null };
+    }
+
+    try {
+      const profileRows = await this._fetchJson('/profile', { symbol });
+      const profile = this._asArray(profileRows)[0];
+      if (!profile) {
+        return { ...fallback, error: 'Symbol not found in FMP profile' };
+      }
+      return { ...buildResolvedSymbol(symbol, profile, 'fmp'), error: null };
+    } catch (e) {
+      return { ...fallback, error: e.message || 'Resolve failed — using suffix defaults' };
     }
   }
 

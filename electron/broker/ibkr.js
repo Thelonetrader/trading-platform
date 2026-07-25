@@ -303,7 +303,8 @@ class IbkrAdapter {
   }
 
   _contractKey(contract) {
-    return `${contract.exchange || 'SMART'}|${contract.currency || 'USD'}`;
+    const pe = contract.primaryExch ? `|${contract.primaryExch}` : '';
+    return `${contract.exchange || 'SMART'}|${contract.currency || 'USD'}${pe}`;
   }
 
   _contractFromSymbol(entry) {
@@ -317,12 +318,15 @@ class IbkrAdapter {
     }
     const exchange = (typeof entry === 'object' && entry?.exchange) || 'SMART';
     const currency = (typeof entry === 'object' && entry?.currency) || 'USD';
-    return {
+    const primaryExch = typeof entry === 'object' && entry?.primaryExch ? entry.primaryExch : undefined;
+    const contract = {
       symbol: symbol.toUpperCase(),
       secType: SecType.STK,
       exchange,
       currency,
     };
+    if (primaryExch) contract.primaryExch = primaryExch;
+    return contract;
   }
 
   _cancelQuoteSubscription(sym) {
@@ -391,13 +395,13 @@ class IbkrAdapter {
     return Object.fromEntries(this.quotes);
   }
 
-  placeOrder({ symbol, side, quantity, orderType, limitPrice, tif, exchange, currency }) {
+  placeOrder({ symbol, side, quantity, orderType, limitPrice, tif, exchange, currency, primaryExch }) {
     if (!this.ib || this.status !== 'connected' || this.nextOrderId == null) {
       throw new Error('Not connected to IB Gateway');
     }
 
     const orderId = this.nextOrderId++;
-    const contract = this._contractFromSymbol({ symbol, exchange, currency });
+    const contract = this._contractFromSymbol({ symbol, exchange, currency, primaryExch });
     const action = side === 'SELL' ? OrderAction.SELL : OrderAction.BUY;
     const type = orderType === 'LMT' ? OrderType.LMT : OrderType.MKT;
 

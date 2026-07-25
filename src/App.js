@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Journal from './Journal';
 import Watchlist from './Watchlist';
 import Portfolio from './Portfolio';
@@ -26,6 +26,12 @@ import {
 } from './utils/storageStats';
 import { mergeLiveSubscribeSymbols, WATCHLIST_CHANGED_EVENT } from './utils/liveSubscribe';
 import { quoteForSymbol } from './utils/quoteDisplay';
+import { contractFromResolved, resolveSymbolForTerminal } from './utils/resolveSymbolContract';
+import {
+  patchWatchlistFromResolved,
+  reconcilePlaceholderWatchlistEntries,
+  resolveAndPatchWatchlist,
+} from './utils/watchlistAutoFill';
 
 function App() {
   const [activePage, setActivePage] = useState('terminal');
@@ -60,25 +66,26 @@ function App() {
     isElectron,
   } = useTradingApi();
 
-  const { testFmp, config: marketConfig } = useMarketData();
+  const { testFmp, config: marketConfig, fetchNews } = useMarketData();
   const hasFmpKey = !!(settings?.marketData?.fmpApiKey || marketConfig.fmpApiKey || '').trim();
 
   useAlertNotifications(quotes);
 
+  const resolveGenRef = useRef(0);
+
   const openTerminalForTicker = useCallback((sym) => {
     const upper = (sym || '').trim().toUpperCase();
     if (!upper) return;
-    const w = readJson('watchlist', []).find(
-      (x) => (x.ticker || '').trim().toUpperCase() === upper,
-    );
+    const gen = ++resolveGenRef.current;
     setActiveSymbol(upper);
-    if (w) {
-      setActiveContract({
-        exchange: w.exchange || 'SMART',
-        currency: w.currency || 'USD',
-      });
-    }
     setActivePage('terminal');
+    resolveSymbolForTerminal(upper).then((resolved) => {
+      if (resolveGenRef.current !== gen) return;
+      setActiveContract(contractFromResolved(resolved));
+      if (patchWatchlistFromResolved(resolved).updated) {
+        setTerminalResearchVersion((v) => v + 1);
+      }
+    });
   }, []);
 
   const watchlistSymbols = getWatchlistSymbols();
@@ -125,6 +132,13 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!hasFmpKey) return;
+    reconcilePlaceholderWatchlistEntries({ limit: 12 }).then(({ reconciled }) => {
+      if (reconciled > 0) setPortfolioSubTick((t) => t + 1);
+    });
+  }, [hasFmpKey]);
+
+  useEffect(() => {
     if (connection.status !== 'connected') return;
     const syms = mergeLiveSubscribeSymbols({
       activeSymbol,
@@ -160,35 +174,26 @@ function App() {
         return;
       }
       if (cmd.type === 'symbol') {
-        setActiveSymbol(cmd.symbol);
-        setActivePage('terminal');
+        openTerminalForTicker(cmd.symbol);
         setCommandOpen(false);
         return;
       }
       if (cmd.type === 'order') {
-        setActiveSymbol(cmd.symbol);
+        openTerminalForTicker(cmd.symbol);
         setOrderPreset({ side: cmd.side, qty: cmd.qty });
-        setActivePage('terminal');
         setCommandOpen(false);
         return;
       }
       if (cmd.type === 'watch') {
-        const list = JSON.parse(localStorage.getItem('watchlist') || '[]');
-        if (!list.some((s) => (s.ticker || '').toUpperCase() === cmd.symbol)) {
-          list.unshift({
-            id: Date.now(),
-            ticker: cmd.symbol,
-            exchange: 'SMART',
-            currency: 'USD',
-            priority: 'Medium',
-            addedDate: new Date().toISOString().split('T')[0],
-          });
-          localStorage.setItem('watchlist', JSON.stringify(list));
-          window.dispatchEvent(new Event(WATCHLIST_CHANGED_EVENT));
-        }
-        setActiveSymbol(cmd.symbol);
         setCommandOpen(false);
-        setCommandMsg(`Added ${cmd.symbol} to watchlist`);
+        resolveAndPatchWatchlist(cmd.symbol, { addIfMissing: true }).then(({ created, resolved }) => {
+          openTerminalForTicker(resolved.symbol || cmd.symbol);
+          setCommandMsg(
+            created
+              ? `Added ${cmd.symbol} to watchlist (auto-filled exchange & name)`
+              : `Updated ${cmd.symbol} on watchlist`,
+          );
+        });
         return;
       }
       if (cmd.type === 'unknown') {
@@ -197,7 +202,7 @@ function App() {
       }
       setCommandOpen(false);
     },
-    [],
+    [openTerminalForTicker],
   );
 
   const navItems = [
@@ -367,6 +372,9 @@ function App() {
               symbol={activeSymbol}
               exchange={activeContract.exchange}
               currency={activeContract.currency}
+              primaryExch={activeContract.primaryExch}
+              listingExchange={activeContract.listingExchange}
+              resolvedName={activeContract.name}
               quote={activeSymbol ? quoteForSymbol(quotes, activeSymbol) : null}
               connection={connection}
               settings={settings}
@@ -398,6 +406,9 @@ function App() {
               fetchHistoricalBars={fetchHistoricalBars}
               fetchFundamentals={fetchFundamentals}
               hasFmpKey={hasFmpKey}
+              fetchNews={fetchNews}
+              isElectron={isElectron}
+              onOpenNews={() => setActivePage('news')}
             />
           )}
           {activePage === 'dashboard' && (
@@ -412,11 +423,7 @@ function App() {
           {activePage === 'watchlist' && (
             <Watchlist
               quotes={quotes}
-              onSelectSymbol={(sym, contract) => {
-                setActiveSymbol(sym);
-                if (contract) setActiveContract(contract);
-                setActivePage('terminal');
-              }}
+              onSelectSymbol={(sym) => openTerminalForTicker(sym)}
             />
           )}
           {activePage === 'portfolio' && (
@@ -452,19 +459,7 @@ function App() {
                 setScorecardFocus({ ticker: sym, sector: sector || 'core' });
                 setActivePage('scorecard');
               }}
-              onOpenTerminal={(sym) => {
-                const w = readJson('watchlist', []).find(
-                  (x) => (x.ticker || '').toUpperCase() === sym.toUpperCase(),
-                );
-                setActiveSymbol(sym.toUpperCase());
-                if (w) {
-                  setActiveContract({
-                    exchange: w.exchange || 'SMART',
-                    currency: w.currency || 'USD',
-                  });
-                }
-                setActivePage('terminal');
-              }}
+              onOpenTerminal={(sym) => openTerminalForTicker(sym)}
             />
           )}
           {activePage === 'screener' && (
@@ -473,11 +468,7 @@ function App() {
               quotes={quotes}
               connection={connection}
               onUniverseTickersChange={setScreenerExtraTickers}
-              onOpenTerminal={(sym, contract) => {
-                setActiveSymbol(sym);
-                if (contract) setActiveContract(contract);
-                setActivePage('terminal');
-              }}
+              onOpenTerminal={(sym) => openTerminalForTicker(sym)}
               onOpenScorecard={(sym, sector) => {
                 setScorecardFocus({ ticker: sym, sector: sector || 'core' });
                 setActivePage('scorecard');
@@ -488,16 +479,7 @@ function App() {
             <Alerts
               quotes={quotes}
               connection={connection}
-              onOpenTerminal={(sym, contract) => {
-                setActiveSymbol(sym);
-                if (contract?.exchange) {
-                  setActiveContract({
-                    exchange: contract.exchange || 'SMART',
-                    currency: contract.currency || 'USD',
-                  });
-                }
-                setActivePage('terminal');
-              }}
+              onOpenTerminal={(sym) => openTerminalForTicker(sym)}
               onOpenScreener={() => setActivePage('screener')}
             />
           )}

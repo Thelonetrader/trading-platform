@@ -9,6 +9,10 @@ export function readJson(key, fallback = []) {
   }
 }
 
+export function writeJson(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
 export function getPortfolioStats(quotes = {}) {
   const holdings = readJson('portfolio');
   const totalValue = holdings.reduce((sum, h) => {

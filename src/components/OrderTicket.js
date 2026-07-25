@@ -60,6 +60,8 @@ export default function OrderTicket({
   symbol,
   exchange,
   currency,
+  primaryExch,
+  listingExchange,
   quote,
   securityName,
   connection,
@@ -113,12 +115,13 @@ export default function OrderTicket({
     };
   }, [symbol, routeExchange, ccy, fetchFundamentals]);
 
-  const listingExchange = useMemo(() => {
+  const listingExchangeResolved = useMemo(() => {
+    if (listingExchange) return String(listingExchange).toUpperCase();
     if (routeExchange !== 'SMART') return routeExchange;
     const fmp = instrument?.exchange;
     if (fmp) return String(fmp).toUpperCase();
     return null;
-  }, [routeExchange, instrument]);
+  }, [routeExchange, listingExchange, instrument]);
 
   const displayName = securityName || instrument?.companyName || null;
   const last = displayPrice(quote);
@@ -159,6 +162,7 @@ export default function OrderTicket({
         symbol,
         exchange: routeExchange,
         currency: ccy,
+        primaryExch: primaryExch || undefined,
         side,
         quantity: Number(qty),
         orderType,
@@ -248,7 +252,7 @@ export default function OrderTicket({
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
           <Tag>STK</Tag>
           <Tag>{ccy}</Tag>
-          {listingExchange && <Tag accent>Listed {listingExchange}</Tag>}
+          {listingExchangeResolved && <Tag accent>Listed {listingExchangeResolved}</Tag>}
           <Tag muted>Route {routeExchange}</Tag>
         </div>
       </div>
@@ -288,7 +292,8 @@ export default function OrderTicket({
           <InfoRow label="Account" value={accountId || 'Default (managed)'} mono />
           <InfoRow label="Sec type" value="STK" />
           <InfoRow label="Currency" value={ccy} />
-          <InfoRow label="Listing" value={listingExchange || (routeExchange !== 'SMART' ? routeExchange : 'Add FMP key or set Watchlist exchange')} />
+          <InfoRow label="Listing" value={listingExchangeResolved || (routeExchange !== 'SMART' ? routeExchange : 'Add FMP key or set Watchlist exchange')} />
+          {primaryExch && routeExchange === 'SMART' && <InfoRow label="Primary" value={primaryExch} mono />}
           <InfoRow label="IB route" value={routeExchange} mono />
         </div>
 
@@ -431,7 +436,7 @@ export default function OrderTicket({
             {orderType === 'LMT' && limitPrice ? ` @ ${limitPrice}` : ''} · {tifLabel}
             <br />
             {ccy} · Route {routeExchange}
-            {listingExchange ? ` · Listed ${listingExchange}` : ''}
+            {listingExchangeResolved ? ` · Listed ${listingExchangeResolved}` : ''}
             {accountId ? ` · Acct ${accountId}` : ''}
           </div>
         )}

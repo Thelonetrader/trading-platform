@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TerminalChart from './TerminalChart';
 import TerminalKeyMetrics from './TerminalKeyMetrics';
+import TerminalBreakingNews from './TerminalBreakingNews';
 import OrderTicket from './OrderTicket';
 import OpenOrdersPanel from './OpenOrdersPanel';
 import { RESEARCH_DATA_IMPORTED_EVENT } from '../utils/dataBackup';
@@ -143,6 +144,9 @@ export default function TerminalWorkspace({
   symbol,
   exchange,
   currency,
+  primaryExch,
+  listingExchange,
+  resolvedName,
   quote,
   connection,
   settings,
@@ -161,6 +165,9 @@ export default function TerminalWorkspace({
   fetchHistoricalBars,
   fetchFundamentals,
   hasFmpKey,
+  fetchNews,
+  isElectron,
+  onOpenNews,
 }) {
   const [research, setResearch] = useState(null);
 
@@ -206,6 +213,9 @@ export default function TerminalWorkspace({
               {symbol && watch?.name && (
                 <span style={{ fontSize: 16, color: '#94a3b8', alignSelf: 'center' }}>{watch.name}</span>
               )}
+              {symbol && !watch?.name && resolvedName && (
+                <span style={{ fontSize: 16, color: '#94a3b8', alignSelf: 'center' }}>{resolvedName}</span>
+              )}
               {symbol && px != null && (
                 <span style={{ fontSize: 20, color: '#e2e8f0', alignSelf: 'center' }}>{px.toFixed(2)}</span>
               )}
@@ -217,7 +227,12 @@ export default function TerminalWorkspace({
               )}
             </div>
             <div style={{ marginTop: 8, fontSize: 12, color: '#64748b', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              <span>{exchange || 'SMART'} · {currency || 'USD'}</span>
+              <span>
+                {listingExchange ? `Listed ${listingExchange}` : exchange || 'SMART'}
+                {primaryExch && exchange === 'SMART' ? ` · ${primaryExch}` : ''}
+                {' · '}
+                {currency || 'USD'}
+              </span>
               {watch?.priority && (
                 <span style={{ color: watch.priority === 'High' ? '#ef4444' : watch.priority === 'Medium' ? '#f59e0b' : '#22c55e' }}>
                   {watch.priority} priority
@@ -261,6 +276,7 @@ export default function TerminalWorkspace({
                 symbol={symbol}
                 exchange={exchange}
                 currency={currency}
+                primaryExch={primaryExch}
                 connection={connection}
                 fetchHistoricalBars={fetchHistoricalBars}
               />
@@ -382,8 +398,10 @@ export default function TerminalWorkspace({
           symbol={symbol}
           exchange={exchange}
           currency={currency}
+          primaryExch={primaryExch}
+          listingExchange={listingExchange}
           quote={quote}
-          securityName={watch?.name}
+          securityName={watch?.name || resolvedName}
           connection={connection}
           settings={settings}
           preset={orderPreset}
@@ -399,6 +417,16 @@ export default function TerminalWorkspace({
         refreshing={ordersRefreshing}
         busyOrderId={cancelBusyId}
       />
+      <div style={{ marginTop: 16 }}>
+        <TerminalBreakingNews
+          symbol={symbol || null}
+          fetchNews={fetchNews}
+          hasFmpKey={hasFmpKey}
+          isElectron={isElectron}
+          onOpenNews={onOpenNews}
+          onSymbolClick={onSymbolChange}
+        />
+      </div>
     </div>
   );
 }

@@ -20,6 +20,8 @@ function registerMarketDataIpc(broker) {
 
   ipcMain.handle('marketData:getFundamentals', async (_e, entry) => service.getFundamentals(entry || {}));
 
+  ipcMain.handle('marketData:resolveSymbol', async (_e, ticker) => service.resolveSymbol(ticker));
+
   ipcMain.handle('marketData:getNews', async (_e, opts) => service.getNews(opts || {}));
 
   ipcMain.handle('marketData:getEarningsCalendar', async (_e, opts) =>
