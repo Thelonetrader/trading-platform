@@ -73,6 +73,7 @@ function createService() {
     resolveSymbol: (ticker) => fmp.resolveSymbol(ticker),
     getNews: (opts) => fmp.getNews(opts),
     getEarningsCalendar: (opts) => fmp.getEarningsCalendar(opts),
+    getScreenerSnapshots: (tickers) => fmp.getScreenerSnapshots(tickers),
   };
 }
 

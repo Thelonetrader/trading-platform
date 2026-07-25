@@ -29,6 +29,17 @@ node node_modules/electron/install.js
 
 Never run `sudo electron` or `sudo npm install` in this project.
 
+## AI research assistant (free / local)
+
+The Terminal chat assistant uses **provider profiles** — start with free Ollama, add BYOK paid APIs later, Pro hosting when you wire billing.
+
+1. Install [Ollama](https://ollama.com) and `ollama pull llama3.2`
+2. Run `npm run electron:dev` (restart after main-process updates)
+3. **Settings → AI assistant** — **Local · Ollama** → **Test active profile** → **Save profile**
+4. **Add profile** for OpenAI, Groq, or custom compatible endpoints when ready
+
+See [docs/AI_PROVIDERS.md](docs/AI_PROVIDERS.md) for subscription tiers and future Pro models.
+
 ## Run production build locally (unpacked)
 
 Builds the React app and opens it in Electron without the dev server:
@@ -92,7 +103,7 @@ Cached responses use the TTL in Settings (default 60 minutes). Restart Electron 
 
 - **Terminal** — symbol workspace, **key metrics** (FMP/IB), **IB daily chart** (hover OHLCV), order ticket, quote strip, ⌘K command bar
 - **Watchlist** — local notes + live quotes when IB connected (exchange/currency per symbol)
-- **Stock Screener** — filter watchlist or index universes (Mag 7, Dow, etc.) by priority, scorecard, journal, IB day change, custom rank; saved presets
+- **Stock Screener** — universe tables with **live IB** last/bid/ask/change, **FMP** P/E, EPS growth, FCF yield, market cap; metric filters and saved presets
 - **Scorecards** — sector fundamental scorecards; **auto-fill from FMP and/or IB**; save evaluations to the research library
 - **News & Sentiment** — FMP headlines per watchlist tickers + lexicon sentiment; earnings calendar block
 - **Portfolio** — manual holdings or IB positions tab

@@ -41,4 +41,15 @@ contextBridge.exposeInMainWorld('marketData', {
   resolveSymbol: (ticker) => ipcRenderer.invoke('marketData:resolveSymbol', ticker),
   getNews: (opts) => ipcRenderer.invoke('marketData:getNews', opts),
   getEarningsCalendar: (opts) => ipcRenderer.invoke('marketData:getEarningsCalendar', opts),
+  getScreenerSnapshots: (tickers) => ipcRenderer.invoke('marketData:getScreenerSnapshots', tickers),
+});
+
+contextBridge.exposeInMainWorld('agent', {
+  getConfig: () => ipcRenderer.invoke('agent:getConfig'),
+  setConfig: (patch) => ipcRenderer.invoke('agent:setConfig', patch),
+  setActiveProfile: (profileId) => ipcRenderer.invoke('agent:setActiveProfile', profileId),
+  updateProfile: (profileId, fields) => ipcRenderer.invoke('agent:updateProfile', profileId, fields),
+  addProfile: (templateId) => ipcRenderer.invoke('agent:addProfile', templateId),
+  test: () => ipcRenderer.invoke('agent:test'),
+  chat: (payload) => ipcRenderer.invoke('agent:chat', payload),
 });

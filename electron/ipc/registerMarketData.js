@@ -27,6 +27,10 @@ function registerMarketDataIpc(broker) {
   ipcMain.handle('marketData:getEarningsCalendar', async (_e, opts) =>
     service.getEarningsCalendar(opts || {}),
   );
+
+  ipcMain.handle('marketData:getScreenerSnapshots', async (_e, tickers) =>
+    service.getScreenerSnapshots(tickers || []),
+  );
 }
 
 module.exports = { registerMarketDataIpc };

@@ -15,6 +15,7 @@ const noopMarket = {
   resolveSymbol: async (ticker) => resolveSymbolHeuristic(ticker),
   getNews: async () => ({ items: [], error: 'Market data requires Electron' }),
   getEarningsCalendar: async () => ({ items: [], error: 'Market data requires Electron' }),
+  getScreenerSnapshots: async () => ({ snapshots: {}, count: 0, error: 'Market data requires Electron' }),
 };
 
 export function useMarketData() {
@@ -44,6 +45,8 @@ export function useMarketData() {
 
   const fetchEarningsCalendar = useCallback((opts) => api.getEarningsCalendar(opts), [api]);
 
+  const fetchScreenerSnapshots = useCallback((tickers) => api.getScreenerSnapshots(tickers), [api]);
+
   const hasFmpKey = !!(config.fmpApiKey || '').trim();
 
   return {
@@ -56,6 +59,7 @@ export function useMarketData() {
     resolveSymbol,
     fetchNews,
     fetchEarningsCalendar,
+    fetchScreenerSnapshots,
   };
 }
 

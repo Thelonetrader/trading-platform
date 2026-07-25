@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import TerminalChart from './TerminalChart';
 import TerminalKeyMetrics from './TerminalKeyMetrics';
 import TerminalBreakingNews from './TerminalBreakingNews';
+import AgentPanel from './AgentPanel';
 import OrderTicket from './OrderTicket';
 import OpenOrdersPanel from './OpenOrdersPanel';
 import { RESEARCH_DATA_IMPORTED_EVENT } from '../utils/dataBackup';
@@ -168,6 +169,10 @@ export default function TerminalWorkspace({
   fetchNews,
   isElectron,
   onOpenNews,
+  agentChat,
+  agentEnabled,
+  agentProfileLabel,
+  agentProfileTier,
 }) {
   const [research, setResearch] = useState(null);
 
@@ -279,6 +284,16 @@ export default function TerminalWorkspace({
                 primaryExch={primaryExch}
                 connection={connection}
                 fetchHistoricalBars={fetchHistoricalBars}
+              />
+              <AgentPanel
+                symbol={symbol}
+                quote={quote}
+                connection={connection}
+                chat={agentChat}
+                enabled={agentEnabled}
+                isElectron={isElectron}
+                profileLabel={agentProfileLabel}
+                profileTier={agentProfileTier}
               />
               <div
                 style={{

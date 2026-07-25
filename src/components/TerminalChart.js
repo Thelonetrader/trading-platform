@@ -1,61 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isChartPopoutWindow } from '../ChartPopoutApp';
+import {
+  BAR_SIZE_OPTIONS,
+  coerceDurationForBarSize,
+  defaultVisibleBarCount,
+  durationsForBarSize,
+  formatBarAxisLabel,
+  formatBarTooltipTime,
+  isIntradayBarSize,
+} from '../utils/chartBars';
 
-const DURATIONS = [
-  { id: '3 M', label: '3M' },
-  { id: '6 M', label: '6M' },
-  { id: '1 Y', label: '1Y' },
-  { id: '2 Y', label: '2Y' },
-];
-
-const BAR_SIZES = [
-  { id: '1 day', label: 'Daily' },
-  { id: '1 week', label: 'Weekly' },
-];
-
-function formatBarDate(time) {
-  const s = String(time || '');
-  if (s.length === 8 && /^\d{8}$/.test(s)) {
-    return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
-  }
-  return s;
+function formatBarDate(time, barSize) {
+  return formatBarAxisLabel(time, barSize);
 }
 
 function formatBarDateTime(time, barSize) {
-  const s = String(time || '');
-  if (/^\d{8}$/.test(s)) {
-    const d = new Date(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}T16:00:00`);
-    if (!Number.isNaN(d.getTime())) {
-      if (barSize === '1 week') {
-        return d.toLocaleString('en-GB', {
-          weekday: 'short',
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-        });
-      }
-      return d.toLocaleString('en-GB', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
-    }
-  }
-  if (/^\d+$/.test(s) && s.length >= 10) {
-    const d = new Date(Number(s) * 1000);
-    if (!Number.isNaN(d.getTime())) {
-      return d.toLocaleString('en-GB', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    }
-  }
-  return formatBarDate(time);
+  return formatBarTooltipTime(time, barSize);
 }
 
 function formatVolume(vol) {
@@ -65,6 +25,32 @@ function formatVolume(vol) {
   if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
   if (v >= 1e3) return `${(v / 1e3).toFixed(1)}K`;
   return String(Math.round(v));
+}
+
+const VOL_CHART_SETTINGS_KEY = 'terminal-chart-volume';
+
+function readVolChartSettings() {
+  try {
+    const raw = localStorage.getItem(VOL_CHART_SETTINGS_KEY);
+    if (!raw) return { paneShare: 0.24, scale: 1 };
+    const p = JSON.parse(raw);
+    const paneShare = Number(p.paneShare);
+    const scale = Number(p.scale);
+    return {
+      paneShare: Number.isFinite(paneShare) ? Math.min(0.5, Math.max(0.12, paneShare)) : 0.24,
+      scale: Number.isFinite(scale) ? Math.min(4, Math.max(0.25, scale)) : 1,
+    };
+  } catch {
+    return { paneShare: 0.24, scale: 1 };
+  }
+}
+
+function clampVolPaneShare(n) {
+  return Math.min(0.5, Math.max(0.12, n));
+}
+
+function clampVolScale(n) {
+  return Math.min(4, Math.max(0.25, n));
 }
 
 const PRICE_SCALE_W = 72;
@@ -112,6 +98,24 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
   const [hoverIndex, setHoverIndex] = useState(null);
   const [viewStart, setViewStart] = useState(0);
   const [viewEnd, setViewEnd] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [volResizing, setVolResizing] = useState(false);
+  const [volPaneShare, setVolPaneShare] = useState(() => readVolChartSettings().paneShare);
+  const [volScale, setVolScale] = useState(() => readVolChartSettings().scale);
+  const dragRef = useRef(null);
+  const volResizeRef = useRef(null);
+  const plotMetricsRef = useRef({ innerW: 1, span: 1, bodyH: 1 });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        VOL_CHART_SETTINGS_KEY,
+        JSON.stringify({ paneShare: volPaneShare, scale: volScale }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [volPaneShare, volScale]);
 
   useEffect(() => {
     if (!bars.length) {
@@ -119,9 +123,10 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
       setViewEnd(0);
       return;
     }
-    setViewStart(0);
+    const defaultVisible = defaultVisibleBarCount(barSize, bars.length);
+    setViewStart(Math.max(0, bars.length - defaultVisible));
     setViewEnd(bars.length - 1);
-  }, [bars]);
+  }, [bars, barSize]);
 
   const visibleBars = useMemo(() => {
     if (!bars.length) return [];
@@ -192,24 +197,116 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
     [bars.length, viewStart, viewEnd, applyRange],
   );
 
+  const jumpToRecent = useCallback(() => {
+    if (!bars.length) return;
+    const defaultVisible = defaultVisibleBarCount(barSize, bars.length);
+    applyRange(Math.max(0, bars.length - defaultVisible), bars.length - 1);
+  }, [bars.length, barSize, applyRange]);
+
   const handleWheel = useCallback(
     (e) => {
       if (!bars.length) return;
       e.preventDefault();
-      const anchor = hoverIndex != null ? viewStart + hoverIndex : undefined;
-      if (e.deltaY < 0) zoomAt(0.72, anchor);
-      else zoomAt(1.38, anchor);
+      const span = viewEnd - viewStart + 1;
+      const { innerW } = plotMetricsRef.current;
+
+      if (e.ctrlKey || e.metaKey) {
+        const anchor = hoverIndex != null ? viewStart + hoverIndex : undefined;
+        if (e.deltaY < 0) zoomAt(0.82, anchor);
+        else zoomAt(1.22, anchor);
+        return;
+      }
+
+      const primaryDelta =
+        Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      const barsDelta = Math.round((primaryDelta / Math.max(1, innerW)) * span * 0.85);
+      if (barsDelta !== 0) panBy(-barsDelta);
     },
-    [bars.length, hoverIndex, viewStart, zoomAt],
+    [bars.length, hoverIndex, viewStart, viewEnd, zoomAt, panBy],
   );
+
+  const endDrag = useCallback(() => {
+    dragRef.current = null;
+    setDragging(false);
+  }, []);
+
+  const startDrag = useCallback(
+    (clientX) => {
+      if (!bars.length) return;
+      dragRef.current = {
+        startX: clientX,
+        viewStart,
+        viewEnd,
+      };
+      setDragging(true);
+    },
+    [bars.length, viewStart, viewEnd],
+  );
+
+  useEffect(() => {
+    if (!dragging) return undefined;
+
+    const onMove = (e) => {
+      const d = dragRef.current;
+      if (!d || !bars.length) return;
+      const span = d.viewEnd - d.viewStart + 1;
+      const { innerW } = plotMetricsRef.current;
+      const dx = e.clientX - d.startX;
+      const barsDelta = Math.round((dx / Math.max(1, innerW)) * span);
+      applyRange(d.viewStart - barsDelta, d.viewEnd - barsDelta);
+    };
+
+    const onUp = () => endDrag();
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [dragging, bars.length, applyRange, endDrag]);
+
+  useEffect(() => {
+    if (!volResizing) return undefined;
+
+    const onMove = (e) => {
+      const r = volResizeRef.current;
+      if (!r) return;
+      const bodyH = plotMetricsRef.current.bodyH || 1;
+      const deltaShare = (e.clientY - r.startY) / bodyH;
+      setVolPaneShare(clampVolPaneShare(r.startShare + deltaShare));
+    };
+
+    const onUp = () => {
+      volResizeRef.current = null;
+      setVolResizing(false);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, [volResizing]);
 
   const pad = { top: 8, right: PRICE_SCALE_W, bottom: 22, left: 8 };
   const plotLeft = pad.left;
   const plotRight = width - pad.right;
-  const volStripH = 36;
-  const priceH = height - volStripH - pad.bottom;
+  const chartBodyH = Math.max(80, height - pad.bottom);
+  const volStripH = Math.round(Math.max(28, chartBodyH * volPaneShare));
+  const priceH = pad.top + (chartBodyH - volStripH);
   const innerW = Math.max(1, width - pad.left - pad.right);
   const innerH = Math.max(1, priceH - pad.top);
+  plotMetricsRef.current.bodyH = chartBodyH;
 
   const { minL, maxH, slots, slotW, maxVol } = useMemo(() => {
     if (!visibleBars.length) return { minL: 0, maxH: 1, slots: [], slotW: 1, maxVol: 0 };
@@ -248,16 +345,19 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
     return { minL, maxH, slots, slotW, maxVol };
   }, [visibleBars, innerW, innerH, pad.top, plotLeft]);
 
+  const visibleSpan = viewEnd - viewStart + 1;
+  plotMetricsRef.current = { innerW, span: Math.max(1, visibleSpan) };
   const canZoomIn = visibleBars.length > Math.min(5, bars.length);
   const canZoomOut = visibleBars.length < bars.length;
   const canPanLeft = viewStart > 0;
   const canPanRight = viewEnd < bars.length - 1;
 
-  const volTop = priceH + 4;
-  const volInnerH = volStripH - 8;
+  const volTop = priceH + 6;
+  const volInnerH = Math.max(8, volStripH - 12);
+  const volDisplayMax = maxVol > 0 ? maxVol / volScale : 0;
 
   const handleMouseMove = (e) => {
-    if (!slots.length) return;
+    if (dragging || volResizing || !slots.length) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     if (x < plotLeft || x >= plotRight) {
@@ -304,7 +404,7 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
         }}
       >
         <span style={{ fontSize: 10, color: '#475569' }}>
-          {visibleBars.length} of {bars.length} bars · scroll to zoom
+          {visibleBars.length} of {bars.length} bars · drag or scroll to move time · ⌘/ctrl + scroll to zoom
         </span>
         <button type="button" style={zoomBtn} disabled={!canPanLeft} onClick={() => panBy(-Math.max(1, Math.floor(visibleBars.length * 0.15)))}>
           ◀
@@ -318,9 +418,36 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
         <button type="button" style={zoomBtn} disabled={!canZoomOut} onClick={() => zoomAt(1.38)}>
           +
         </button>
-        <button type="button" style={zoomBtn} onClick={() => applyRange(0, bars.length - 1)}>
-          Reset
+        <button type="button" style={zoomBtn} onClick={jumpToRecent}>
+          Recent
         </button>
+        <button type="button" style={zoomBtn} onClick={() => applyRange(0, bars.length - 1)}>
+          All
+        </button>
+        <span style={{ width: 1, height: 14, background: '#1a2035', margin: '0 2px' }} />
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#64748b' }}>
+          Vol height
+          <input
+            type="range"
+            min={12}
+            max={50}
+            value={Math.round(volPaneShare * 100)}
+            onChange={(e) => setVolPaneShare(clampVolPaneShare(Number(e.target.value) / 100))}
+            style={{ width: 72, accentColor: '#6366f1' }}
+          />
+        </label>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#64748b' }}>
+          Vol scale
+          <input
+            type="range"
+            min={25}
+            max={400}
+            value={Math.round(volScale * 100)}
+            onChange={(e) => setVolScale(clampVolScale(Number(e.target.value) / 100))}
+            style={{ width: 72, accentColor: '#6366f1' }}
+          />
+          <span style={{ color: '#475569', minWidth: 32 }}>{Math.round(volScale * 100)}%</span>
+        </label>
       </div>
       {hoverBar && (
         <div
@@ -366,9 +493,35 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
         height={height}
         role="img"
         aria-label="Price chart"
-        style={{ display: 'block', cursor: 'crosshair' }}
+        style={{
+          display: 'block',
+          cursor: volResizing ? 'ns-resize' : dragging ? 'grabbing' : 'crosshair',
+          userSelect: 'none',
+        }}
         onMouseMove={handleMouseMove}
-        onMouseLeave={() => setHoverIndex(null)}
+        onMouseLeave={() => {
+          if (!dragging) setHoverIndex(null);
+        }}
+        onMouseDown={(e) => {
+          if (e.button !== 0) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          if (Math.abs(y - priceH) <= 6 && x >= plotLeft && x < plotRight) {
+            e.preventDefault();
+            volResizeRef.current = { startY: e.clientY, startShare: volPaneShare };
+            setVolResizing(true);
+            return;
+          }
+          if (x < plotLeft || x >= plotRight) return;
+          e.preventDefault();
+          startDrag(e.clientX);
+        }}
+        onDoubleClick={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          if (x >= plotLeft && x < plotRight) jumpToRecent();
+        }}
       >
       {/* Right price scale gutter */}
       <rect x={plotRight} y={0} width={width - plotRight} height={priceH} fill="#050912" />
@@ -443,7 +596,7 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
           x1={hover.cx}
           x2={hover.cx}
           y1={pad.top}
-          y2={priceH}
+          y2={volTop + volInnerH}
           stroke="#6366f1"
           strokeWidth={1}
           strokeDasharray="4 3"
@@ -453,7 +606,8 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
       {maxVol > 0 &&
         slots.map((s, i) => {
           const v = Number(s.b.volume) || 0;
-          const h = maxVol > 0 ? (v / maxVol) * volInnerH : 0;
+          const rawH = volDisplayMax > 0 ? (v / volDisplayMax) * volInnerH : 0;
+          const h = Math.min(volInnerH, Math.max(v > 0 ? 1 : 0, rawH));
           const dimmed = hoverIndex != null && hoverIndex !== i;
           return (
             <rect
@@ -461,14 +615,29 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
               x={s.cx - s.bodyW / 2}
               y={volTop + volInnerH - h}
               width={s.bodyW}
-              height={Math.max(h, v > 0 ? 1 : 0)}
+              height={h}
               fill={s.up ? '#22c55e' : '#ef4444'}
-              opacity={dimmed ? 0.25 : 0.55}
+              opacity={dimmed ? 0.25 : 0.65}
               pointerEvents="none"
             />
           );
         })}
-      <line x1={plotLeft} x2={plotRight} y1={priceH} y2={priceH} stroke="#334155" strokeWidth={1} />
+      <line x1={plotLeft} x2={plotRight} y1={priceH} y2={priceH} stroke="#475569" strokeWidth={1} />
+      <rect
+        x={plotLeft}
+        y={priceH - 4}
+        width={innerW}
+        height={8}
+        fill="transparent"
+        style={{ cursor: 'ns-resize' }}
+        onMouseDown={(e) => {
+          if (e.button !== 0) return;
+          e.preventDefault();
+          e.stopPropagation();
+          volResizeRef.current = { startY: e.clientY, startShare: volPaneShare };
+          setVolResizing(true);
+        }}
+      />
       <rect x={plotRight} y={priceH} width={width - plotRight} height={height - priceH} fill="#050912" />
       <text x={width - 8} y={volTop + volInnerH / 2 + 3} textAnchor="end" fill="#64748b" fontSize={9}>
         Vol
@@ -477,17 +646,17 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
         x={plotLeft}
         y={pad.top}
         width={innerW}
-        height={height - pad.top - 4}
+        height={Math.max(1, priceH - pad.top)}
         fill="transparent"
       />
       {slots.length > 0 && (
         <text x={plotLeft} y={height - 4} fill="#64748b" fontSize={10}>
-          {formatBarDate(slots[0].b.time)}
+          {formatBarDate(slots[0].b.time, barSize)}
         </text>
       )}
       {slots.length > 1 && (
         <text x={plotRight - 4} y={height - 4} textAnchor="end" fill="#64748b" fontSize={10}>
-          {formatBarDate(slots[slots.length - 1].b.time)}
+          {formatBarDate(slots[slots.length - 1].b.time, barSize)}
         </text>
       )}
       </svg>
@@ -518,13 +687,22 @@ export default function TerminalChart({
   initialBarSize = '1 day',
   expanded = false,
 }) {
-  const [duration, setDuration] = useState(initialDuration);
   const [barSize, setBarSize] = useState(initialBarSize);
+  const [duration, setDuration] = useState(() =>
+    coerceDurationForBarSize(initialBarSize, initialDuration),
+  );
   const [bars, setBars] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [width, setWidth] = useState(600);
   const containerRef = useRef(null);
+
+  const durationOptions = useMemo(() => durationsForBarSize(barSize), [barSize]);
+
+  const onBarSizeChange = useCallback((id) => {
+    setBarSize(id);
+    setDuration((d) => coerceDurationForBarSize(id, d));
+  }, []);
 
   useEffect(() => {
     const node = containerRef.current;
@@ -619,15 +797,15 @@ export default function TerminalChart({
           Historical
         </span>
         <div style={{ display: 'flex', gap: 4 }}>
-          {DURATIONS.map((d) => (
+          {durationOptions.map((d) => (
             <button key={d.id} type="button" style={btnStyle(duration === d.id)} onClick={() => setDuration(d.id)}>
               {d.label}
             </button>
           ))}
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
-          {BAR_SIZES.map((b) => (
-            <button key={b.id} type="button" style={btnStyle(barSize === b.id)} onClick={() => setBarSize(b.id)}>
+          {BAR_SIZE_OPTIONS.map((b) => (
+            <button key={b.id} type="button" style={btnStyle(barSize === b.id)} onClick={() => onBarSizeChange(b.id)}>
               {b.label}
             </button>
           ))}
@@ -639,6 +817,11 @@ export default function TerminalChart({
           <button type="button" onClick={popOut} style={btnStyle(false)} title="Open chart in new window">
             Pop out
           </button>
+        )}
+        {isIntradayBarSize(barSize) && (
+          <span style={{ fontSize: 10, color: '#475569', width: '100%' }}>
+            Intraday bars are US regular hours (ET). Use 5D/1M range to scroll prior sessions.
+          </span>
         )}
       </div>
       {error && !loading && (

@@ -14,6 +14,7 @@ import AccountStrip from './components/AccountStrip';
 import Settings from './components/Settings';
 import { useTradingApi } from './hooks/useTradingApi';
 import { useMarketData } from './hooks/useMarketData';
+import { useAgent } from './hooks/useAgent';
 import { useAlertNotifications } from './hooks/useAlertNotifications';
 import { parseCommand } from './utils/parseCommand';
 import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
@@ -22,7 +23,6 @@ import {
   getJournalCount,
   getPortfolioStats,
   getWatchlistSymbols,
-  readJson,
 } from './utils/storageStats';
 import { mergeLiveSubscribeSymbols, WATCHLIST_CHANGED_EVENT } from './utils/liveSubscribe';
 import { quoteForSymbol } from './utils/quoteDisplay';
@@ -66,7 +66,17 @@ function App() {
     isElectron,
   } = useTradingApi();
 
-  const { testFmp, config: marketConfig, fetchNews } = useMarketData();
+  const { testFmp, config: marketConfig, fetchNews, fetchScreenerSnapshots } = useMarketData();
+  const {
+    config: agentConfig,
+    activeProfile,
+    saveConfig: saveAgentConfig,
+    setActiveProfile,
+    updateProfile,
+    addProfile,
+    testAgent,
+    chat: agentChat,
+  } = useAgent();
   const hasFmpKey = !!(settings?.marketData?.fmpApiKey || marketConfig.fmpApiKey || '').trim();
 
   useAlertNotifications(quotes);
@@ -409,6 +419,10 @@ function App() {
               fetchNews={fetchNews}
               isElectron={isElectron}
               onOpenNews={() => setActivePage('news')}
+              agentChat={agentChat}
+              agentEnabled={agentConfig?.enabled !== false}
+              agentProfileLabel={activeProfile?.label}
+              agentProfileTier={activeProfile?.tier}
             />
           )}
           {activePage === 'dashboard' && (
@@ -473,6 +487,9 @@ function App() {
                 setScorecardFocus({ ticker: sym, sector: sector || 'core' });
                 setActivePage('scorecard');
               }}
+              hasFmpKey={hasFmpKey}
+              fetchScreenerSnapshots={fetchScreenerSnapshots}
+              isElectron={isElectron}
             />
           )}
           {activePage === 'alerts' && (
@@ -491,6 +508,12 @@ function App() {
               onConnect={connect}
               onDisconnect={disconnect}
               onTestFmp={testFmp}
+              agentConfig={agentConfig}
+              onSaveAgent={saveAgentConfig}
+              onAgentSetActiveProfile={setActiveProfile}
+              onAgentUpdateProfile={updateProfile}
+              onAgentAddProfile={addProfile}
+              onTestAgent={testAgent}
               onDataImported={() => {
                 setScreenerRefreshKey((k) => k + 1);
                 window.dispatchEvent(new Event(RESEARCH_DATA_IMPORTED_EVENT));

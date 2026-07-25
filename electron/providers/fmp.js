@@ -188,6 +188,82 @@ class FmpClient {
     }
   }
 
+  async getScreenerSnapshots(symbols) {
+    const list = [
+      ...new Set((symbols || []).map((s) => this.normalizeSymbol(s)).filter(Boolean)),
+    ].slice(0, 80);
+
+    if (!list.length) {
+      return { snapshots: {}, count: 0, error: null };
+    }
+    if (!this._key()) {
+      return { snapshots: {}, count: 0, error: 'Add FMP API key in Settings → Market data' };
+    }
+
+    const snapshots = {};
+    const CHUNK = 15;
+
+    for (let i = 0; i < list.length; i += CHUNK) {
+      const chunk = list.slice(i, i + CHUNK);
+      try {
+        const rows = this._asArray(
+          await this._fetchJson('/profile', { symbol: chunk.join(',') }),
+        );
+        for (const p of rows) {
+          const sym = (p.symbol || '').toUpperCase();
+          if (!sym) continue;
+          snapshots[sym] = {
+            symbol: sym,
+            profile: {
+              companyName: p.companyName,
+              sector: p.sector,
+              industry: p.industry,
+              mktCap: p.mktCap,
+              price: p.price,
+              beta: p.beta,
+              exchange: p.exchangeShortName || p.exchange || null,
+            },
+            metrics: {},
+            updatedAt: Date.now(),
+          };
+        }
+      } catch {
+        /* try per-symbol in chunk below */
+      }
+    }
+
+    let cursor = 0;
+    const poolSize = 4;
+    const fetchMetrics = async (sym) => {
+      if (!snapshots[sym]) {
+        snapshots[sym] = { symbol: sym, profile: null, metrics: {}, updatedAt: Date.now() };
+      }
+      try {
+        const [ratiosRows, growthRows] = await Promise.all([
+          this._fetchJson('/ratios-ttm', { symbol: sym }),
+          this._fetchJson('/financial-growth', { symbol: sym }),
+        ]);
+        snapshots[sym].metrics = mapFmpToMetrics({
+          ratios: this._asArray(ratiosRows)[0],
+          growth: this._asArray(growthRows)[0],
+        });
+        snapshots[sym].updatedAt = Date.now();
+      } catch {
+        /* keep profile-only row */
+      }
+    };
+
+    const workers = Array.from({ length: Math.min(poolSize, list.length) }, async () => {
+      while (cursor < list.length) {
+        const sym = list[cursor++];
+        await fetchMetrics(sym);
+      }
+    });
+    await Promise.all(workers);
+
+    return { snapshots, count: Object.keys(snapshots).length, error: null };
+  }
+
   async getEarningsCalendar({ from, to } = {}) {
     const now = new Date();
     const fromD = from || now.toISOString().slice(0, 10);

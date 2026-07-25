@@ -1,5 +1,6 @@
 import React from 'react';
 import { displayChangePct, displayPrice, normalizeTicker } from '../utils/quoteDisplay';
+import { isUsEquitySessionOpen } from '../utils/usMarketHours';
 
 function fmtPrice(n) {
   if (n == null || Number.isNaN(n)) return '—';
@@ -24,6 +25,16 @@ export default function QuoteStrip({ symbols, activeSymbol, quotes, connection, 
     connection.status === 'connected' &&
     stripSymbols[0] !== '—' &&
     stripSymbols.every((sym) => !displayPrice(quotes[sym]));
+
+  const mdDelayed = connection.marketDataType === 3 || connection.marketDataType === 4;
+  const sessionOpen = isUsEquitySessionOpen();
+  const waitingHint = connection.error
+    ? connection.error.slice(0, 120)
+    : !sessionOpen && mdDelayed
+      ? 'US market closed — delayed ticks idle; loading last close from IB… (or use Delayed frozen in Settings)'
+      : mdDelayed
+        ? 'Waiting for delayed quotes… (15 min lag when US market is open)'
+        : 'Waiting for market data… (reconnect if this persists)';
 
   return (
     <div
@@ -67,12 +78,10 @@ export default function QuoteStrip({ symbols, activeSymbol, quotes, connection, 
       )}
       {waitingTicks && (
         <span
-          style={{ flexShrink: 0, color: connection.error ? '#f59e0b' : '#64748b', fontSize: 11, maxWidth: 360 }}
+          style={{ flexShrink: 0, color: connection.error ? '#f59e0b' : '#64748b', fontSize: 11, maxWidth: 420 }}
           title={connection.error || 'Subscribed — waiting for first tick from IB'}
         >
-          {connection.error
-            ? connection.error.slice(0, 120)
-            : 'Waiting for market data… (reconnect if this persists)'}
+          {waitingHint}
         </span>
       )}
       {stripSymbols.map((sym) => {
@@ -96,7 +105,10 @@ export default function QuoteStrip({ symbols, activeSymbol, quotes, connection, 
             }}
           >
             <span style={{ fontWeight: 700, color: '#e2e8f0' }}>{sym}</span>
-            <span style={{ color: '#94a3b8' }}>{fmtPrice(px)}</span>
+            <span style={{ color: '#94a3b8' }} title={q?.refFromHistory ? 'Last daily close (market closed / no delayed tick yet)' : undefined}>
+              {fmtPrice(px)}
+              {q?.refFromHistory ? '*' : ''}
+            </span>
             <span style={{ color: up ? '#22c55e' : '#ef4444', minWidth: 48 }}>{fmtChg(chg)}</span>
           </div>
         );

@@ -20,6 +20,12 @@ export default function Settings({
   onDisconnect,
   onDataImported,
   onTestFmp,
+  agentConfig,
+  onSaveAgent,
+  onAgentSetActiveProfile,
+  onAgentUpdateProfile,
+  onAgentAddProfile,
+  onTestAgent,
 }) {
   const [form, setForm] = useState({
     host: '127.0.0.1',
@@ -31,6 +37,16 @@ export default function Settings({
     marketDataType: 3,
   });
   const [mdForm, setMdForm] = useState({ fmpApiKey: '', cacheTtlMinutes: 60 });
+  const [agentEnabled, setAgentEnabled] = useState(true);
+  const [editingProfileId, setEditingProfileId] = useState('local-ollama');
+  const [profileDraft, setProfileDraft] = useState({
+    label: '',
+    baseUrl: '',
+    model: '',
+    apiKey: '',
+    maxTokens: 1024,
+  });
+  const [addTemplateId, setAddTemplateId] = useState('openai-byok');
   const [message, setMessage] = useState(null);
   const [includeBrokerExport, setIncludeBrokerExport] = useState(false);
   const [importMode, setImportMode] = useState('merge');
@@ -45,6 +61,42 @@ export default function Settings({
       setMdForm((f) => ({ ...f, ...settings.marketData }));
     }
   }, [settings]);
+
+  useEffect(() => {
+    if (!agentConfig) return;
+    setAgentEnabled(agentConfig.enabled !== false);
+    const pid = agentConfig.activeProfileId || 'local-ollama';
+    setEditingProfileId((prev) =>
+      agentConfig.profiles?.some((p) => p.id === prev) ? prev : pid,
+    );
+  }, [agentConfig]);
+
+  useEffect(() => {
+    if (!agentConfig) return;
+    const p = agentConfig.profiles?.find((x) => x.id === editingProfileId);
+    if (!p) return;
+    setProfileDraft({
+      label: p.label || '',
+      baseUrl: p.baseUrl || '',
+      model: p.model || '',
+      apiKey: '',
+      maxTokens: p.maxTokens ?? 1024,
+    });
+  }, [agentConfig, editingProfileId]);
+
+  const selectProfile = (profileId) => {
+    setEditingProfileId(profileId);
+    const p = agentConfig?.profiles?.find((x) => x.id === profileId);
+    if (p) {
+      setProfileDraft({
+        label: p.label || '',
+        baseUrl: p.baseUrl || '',
+        model: p.model || '',
+        apiKey: '',
+        maxTokens: p.maxTokens ?? 1024,
+      });
+    }
+  };
 
   const setMode = (mode) => {
     const ports = PORT_PRESETS[mode];
@@ -79,6 +131,74 @@ export default function Settings({
       const res = await onTestFmp?.();
       if (res?.ok) setMessage(`FMP connected (${res.sample || 'OK'})`);
       else setMessage(res?.error || 'FMP test failed');
+    } catch (e) {
+      setMessage(e.message || String(e));
+    }
+  };
+
+  const saveAgent = async () => {
+    setMessage(null);
+    try {
+      await onSaveAgent?.({ enabled: agentEnabled });
+      const fields = {
+        label: profileDraft.label.trim(),
+        baseUrl: profileDraft.baseUrl.trim(),
+        model: profileDraft.model.trim(),
+        maxTokens: Number(profileDraft.maxTokens) || 1024,
+      };
+      if (profileDraft.apiKey?.trim()) fields.apiKey = profileDraft.apiKey.trim();
+      await onAgentUpdateProfile?.(editingProfileId, fields);
+      if (agentConfig?.activeProfileId !== editingProfileId) {
+        await onAgentSetActiveProfile?.(editingProfileId);
+      }
+      setMessage('AI profile saved and set active.');
+    } catch (e) {
+      setMessage(e.message || String(e));
+    }
+  };
+
+  const activateProfile = async (profileId) => {
+    setMessage(null);
+    try {
+      await onAgentSetActiveProfile?.(profileId);
+      selectProfile(profileId);
+      setMessage('Active AI profile updated.');
+    } catch (e) {
+      setMessage(e.message || String(e));
+    }
+  };
+
+  const addAgentProfile = async () => {
+    setMessage(null);
+    try {
+      await onAgentAddProfile?.(addTemplateId);
+      setMessage('Provider profile added — edit fields and Save.');
+    } catch (e) {
+      setMessage(e.message || String(e));
+    }
+  };
+
+  const testAgent = async () => {
+    setMessage(null);
+    try {
+      await onSaveAgent?.({ enabled: true });
+      const fields = {
+        baseUrl: profileDraft.baseUrl.trim(),
+        model: profileDraft.model.trim(),
+        maxTokens: Number(profileDraft.maxTokens) || 1024,
+      };
+      if (profileDraft.apiKey?.trim()) fields.apiKey = profileDraft.apiKey.trim();
+      await onAgentUpdateProfile?.(editingProfileId, fields);
+      await onAgentSetActiveProfile?.(editingProfileId);
+      const res = await onTestAgent?.();
+      if (res?.ok) {
+        setMessage(
+          res.warning ||
+            `LLM OK · ${res.profileLabel || 'profile'} (${res.sample || 'connected'})`,
+        );
+      } else {
+        setMessage(res?.error || 'LLM test failed');
+      }
     } catch (e) {
       setMessage(e.message || String(e));
     }
@@ -232,7 +352,7 @@ export default function Settings({
       </label>
 
       <label style={{ display: 'block', marginBottom: 16, fontSize: 11, color: '#64748b' }}>
-        Market data type (applies on Save when connected, or reconnect)
+        Market data type (Save while connected re-subscribes quotes)
         <select
           value={form.marketDataType ?? 3}
           onChange={(e) => setForm((f) => ({ ...f, marketDataType: Number(e.target.value) }))}
@@ -242,6 +362,11 @@ export default function Settings({
           <option value={4}>Delayed frozen — when market closed</option>
           <option value={1}>Live — requires IB market data subscription</option>
         </select>
+        <span style={{ display: 'block', marginTop: 6, color: '#475569', lineHeight: 1.45 }}>
+          After switching to Delayed, click <strong style={{ color: '#94a3b8' }}>Save</strong> (or Disconnect →
+          Connect). Orange “additional subscription” text is for live feeds; delayed quotes may take ~15 minutes
+          after the open.
+        </span>
       </label>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
@@ -265,6 +390,140 @@ export default function Settings({
           Live mode sends real orders. Double-check port and account before connecting.
         </div>
       )}
+
+      <div style={{ marginTop: 40, paddingTop: 28, borderTop: '1px solid #1a2035' }}>
+        <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+          AI assistant
+        </div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', marginTop: 4 }}>Research agent · provider profiles</div>
+        <p style={{ fontSize: 13, color: '#64748b', marginTop: 8, lineHeight: 1.5 }}>
+          Start free with <strong style={{ color: '#94a3b8' }}>Ollama</strong> (local). Add OpenAI, Groq, or any compatible API
+          when you want stronger models — pay providers directly (BYOK). A future <strong style={{ color: '#94a3b8' }}>Pro</strong>{' '}
+          plan can unlock hosted models without pasting keys.
+        </p>
+        <div style={{ marginTop: 12, fontSize: 12, color: '#475569' }}>
+          App plan:{' '}
+          <strong style={{ color: '#94a3b8' }}>
+            {agentConfig?.subscriptionPlans?.find((p) => p.id === agentConfig?.subscription?.plan)?.label ||
+              'Free'}
+          </strong>
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 12, fontSize: 13, color: '#94a3b8' }}>
+          <input
+            type="checkbox"
+            checked={agentEnabled !== false}
+            onChange={(e) => setAgentEnabled(e.target.checked)}
+          />
+          Enable AI assistant on Terminal
+        </label>
+
+        <label style={{ display: 'block', marginBottom: 8, fontSize: 11, color: '#64748b' }}>
+          Active provider profile
+          <select
+            value={editingProfileId}
+            onChange={(e) => selectProfile(e.target.value)}
+            style={fieldStyle}
+          >
+            {(agentConfig?.profiles || []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label} ({p.tier === 'free' ? 'Free' : p.tier === 'byok' ? 'BYOK' : p.tier})
+                {p.id === agentConfig?.activeProfileId ? ' · active' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          <button
+            type="button"
+            style={btnSecondary}
+            disabled={editingProfileId === agentConfig?.activeProfileId}
+            onClick={() => activateProfile(editingProfileId)}
+          >
+            Use this profile
+          </button>
+          <select
+            value={addTemplateId}
+            onChange={(e) => setAddTemplateId(e.target.value)}
+            style={{ ...fieldStyle, flex: 1, minWidth: 160 }}
+          >
+            {(agentConfig?.providerTemplates || []).map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          <button type="button" style={btnSecondary} onClick={addAgentProfile}>
+            Add profile
+          </button>
+        </div>
+
+        {agentConfig?.profiles?.find((p) => p.id === editingProfileId)?.description && (
+          <p style={{ fontSize: 12, color: '#475569', marginBottom: 12 }}>
+            {agentConfig.profiles.find((p) => p.id === editingProfileId).description}
+          </p>
+        )}
+
+        <label style={{ display: 'block', marginBottom: 12, fontSize: 11, color: '#64748b' }}>
+          Display name
+          <input
+            value={profileDraft.label || ''}
+            onChange={(e) => setProfileDraft((f) => ({ ...f, label: e.target.value }))}
+            style={fieldStyle}
+          />
+        </label>
+        <label style={{ display: 'block', marginBottom: 12, fontSize: 11, color: '#64748b' }}>
+          API base URL (OpenAI-compatible /v1)
+          <input
+            value={profileDraft.baseUrl || ''}
+            onChange={(e) => setProfileDraft((f) => ({ ...f, baseUrl: e.target.value }))}
+            placeholder="http://127.0.0.1:11434/v1"
+            style={fieldStyle}
+          />
+        </label>
+        <label style={{ display: 'block', marginBottom: 12, fontSize: 11, color: '#64748b' }}>
+          Model name
+          <input
+            value={profileDraft.model || ''}
+            onChange={(e) => setProfileDraft((f) => ({ ...f, model: e.target.value }))}
+            placeholder="llama3.2"
+            style={fieldStyle}
+          />
+        </label>
+        <label style={{ display: 'block', marginBottom: 12, fontSize: 11, color: '#64748b' }}>
+          API key (optional for Ollama)
+          <input
+            type="password"
+            autoComplete="off"
+            value={profileDraft.apiKey || ''}
+            onChange={(e) => setProfileDraft((f) => ({ ...f, apiKey: e.target.value }))}
+            placeholder={
+              agentConfig?.profiles?.find((p) => p.id === editingProfileId)?.hasApiKey
+                ? 'Saved — enter to replace'
+                : 'Leave blank for Ollama'
+            }
+            style={fieldStyle}
+          />
+        </label>
+        <label style={{ display: 'block', marginBottom: 16, fontSize: 11, color: '#64748b' }}>
+          Max tokens per reply
+          <input
+            type="number"
+            min={256}
+            max={8192}
+            value={profileDraft.maxTokens ?? 1024}
+            onChange={(e) => setProfileDraft((f) => ({ ...f, maxTokens: Number(e.target.value) || 1024 }))}
+            style={fieldStyle}
+          />
+        </label>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button type="button" onClick={saveAgent} style={btnSecondary}>
+            Save profile
+          </button>
+          <button type="button" onClick={testAgent} style={btnSecondary}>
+            Test active profile
+          </button>
+        </div>
+      </div>
 
       <div style={{ marginTop: 40, paddingTop: 28, borderTop: '1px solid #1a2035' }}>
         <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em' }}>

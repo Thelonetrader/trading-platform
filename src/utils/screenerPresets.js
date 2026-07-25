@@ -46,4 +46,8 @@ export const DEFAULT_SCREENER_FILTERS = {
   minRank: '',
   universeId: 'watchlist',
   customUniverse: '',
+  minPe: '',
+  maxPe: '',
+  minEpsGrowth: '',
+  minFcfYield: '',
 };

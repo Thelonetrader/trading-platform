@@ -8,6 +8,30 @@ const {
 } = require('@stoqey/ib');
 const { parseIbFundamentalXml, mapRatiosToMetrics } = require('./fundamentalParse');
 
+function isIntradayBarSize(barSize) {
+  const s = String(barSize || '').toLowerCase();
+  return /\b(min|mins|hour|hours|sec|secs)\b/.test(s);
+}
+
+function parseBarTimeMs(time) {
+  const s = String(time || '').trim();
+  if (/^\d{8}$/.test(s)) {
+    const ms = Date.parse(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}T16:00:00-05:00`);
+    return Number.isNaN(ms) ? 0 : ms;
+  }
+  const m = s.match(/^(\d{4})(\d{2})(\d{2})\s+(\d{1,2}):(\d{2}):(\d{2})$/);
+  if (m) {
+    const hh = m[4].padStart(2, '0');
+    const ms = Date.parse(`${m[1]}-${m[2]}-${m[3]}T${hh}:${m[5]}:${m[6]}-05:00`);
+    return Number.isNaN(ms) ? 0 : ms;
+  }
+  if (/^\d+$/.test(s) && s.length >= 10) {
+    const n = Number(s);
+    return n < 1e12 ? n * 1000 : n;
+  }
+  return 0;
+}
+
 const TICK_LAST = 4;
 const TICK_CLOSE = 9;
 const TICK_BID = 1;
@@ -16,6 +40,9 @@ const TICK_DELAYED_BID = 66;
 const TICK_DELAYED_ASK = 67;
 const TICK_DELAYED_LAST = 68;
 const TICK_DELAYED_CLOSE = 72;
+
+/** Non-fatal IB messages when live data isn't entitled (delayed may still work). */
+const MARKET_DATA_INFO_CODES = new Set([354, 10089, 10167, 10168, 10186]);
 
 function mapTickPrice(tickType, price, patch) {
   if (tickType === TICK_LAST || tickType === TICK_DELAYED_LAST) patch.last = price;
@@ -34,6 +61,7 @@ class IbkrAdapter {
     this.reqIdToSymbol = new Map();
     this.symbolToReqId = new Map();
     this.symbolToContractKey = new Map();
+    this.symbolToContract = new Map();
     this.nextReqId = 1000;
     this.openOrders = [];
     this.positions = [];
@@ -46,6 +74,86 @@ class IbkrAdapter {
     this._pendingOpenOrders = null;
     this._pendingPositions = null;
     this._pendingAccountSummary = null;
+    this.bootstrapTimers = new Map();
+  }
+
+  _clearBootstrapTimers() {
+    for (const t of this.bootstrapTimers.values()) clearTimeout(t);
+    this.bootstrapTimers.clear();
+  }
+
+  _quoteHasDisplayPrice(sym) {
+    const q = this.quotes.get(sym);
+    if (!q) return false;
+    for (const k of ['last', 'bid', 'ask', 'close']) {
+      const v = Number(q[k]);
+      if (Number.isFinite(v) && v > 0) return true;
+    }
+    return false;
+  }
+
+  _scheduleQuoteBootstrap(sym, contract) {
+    const prev = this.bootstrapTimers.get(sym);
+    if (prev) clearTimeout(prev);
+    const t = setTimeout(() => {
+      this.bootstrapTimers.delete(sym);
+      if (!this.ib || this.status !== 'connected') return;
+      if (this._quoteHasDisplayPrice(sym)) return;
+      this._bootstrapQuoteFromHistory(sym, contract);
+    }, 2500);
+    this.bootstrapTimers.set(sym, t);
+  }
+
+  _bootstrapQuoteFromHistory(sym, contract) {
+    if (!this.ib || this.status !== 'connected' || this._quoteHasDisplayPrice(sym)) return;
+
+    const reqId = this.nextReqId++;
+    const bars = [];
+
+    const finish = () => {
+      clearTimeout(timer);
+      this.ib.removeListener(EventName.historicalData, handler);
+    };
+
+    const timer = setTimeout(finish, 15000);
+
+    const handler = (rid, time, open, high, low, close, volume) => {
+      if (rid !== reqId) return;
+      const t = String(time || '');
+      if (t === 'finished' || t.startsWith('finished')) {
+        finish();
+        if (!bars.length) return;
+        const lastBar = bars[bars.length - 1];
+        const prevBar = bars.length > 1 ? bars[bars.length - 2] : null;
+        const patch = {
+          close: prevBar ? prevBar.close : lastBar.close,
+          last: lastBar.close,
+          refFromHistory: true,
+        };
+        const ref = patch.last;
+        const base = patch.close;
+        if (ref != null && base != null && base !== 0) {
+          patch.change = ref - base;
+          patch.changePct = ((ref - base) / base) * 100;
+        }
+        this._emitQuote(sym, patch);
+        return;
+      }
+      const c = Number(close);
+      if (Number.isNaN(c)) return;
+      bars.push({
+        time: t,
+        close: c,
+        volume: Number(volume) || 0,
+      });
+    };
+
+    this.ib.on(EventName.historicalData, handler);
+    try {
+      this.ib.reqHistoricalData(reqId, contract, '', '5 D', '1 day', 'TRADES', 1, 1, false);
+    } catch (_) {
+      finish();
+    }
   }
 
   setCallbacks({ onQuote, onStatusChange, onOrderUpdate }) {
@@ -58,7 +166,25 @@ class IbkrAdapter {
     this.status = status;
     this.lastError = error;
     if (this.onStatusChange) {
-      this.onStatusChange({ status, error });
+      this.onStatusChange({
+        status,
+        error,
+        mode: this.settings.mode || 'paper',
+        marketDataType: Number(this.settings.marketDataType) || 3,
+      });
+    }
+  }
+
+  _clearConnectionError() {
+    if (!this.lastError) return;
+    this.lastError = null;
+    if (this.onStatusChange) {
+      this.onStatusChange({
+        status: this.status,
+        error: null,
+        mode: this.settings.mode || 'paper',
+        marketDataType: Number(this.settings.marketDataType) || 3,
+      });
     }
   }
 
@@ -66,6 +192,7 @@ class IbkrAdapter {
     const prev = this.quotes.get(symbol) || { symbol };
     const next = { ...prev, ...patch, updatedAt: Date.now() };
     this.quotes.set(symbol, next);
+    this._clearConnectionError();
     if (this.onQuote) {
       this.onQuote(next);
     }
@@ -121,16 +248,30 @@ class IbkrAdapter {
           fail(err);
           return;
         }
-        if (code !== ErrorCode.NO_SECURITY_DEFINITION) {
-          this.lastError = msg;
-          if (this.status === 'connected' && reqId != null && this.reqIdToSymbol.has(reqId)) {
-            if (this.onStatusChange) {
-              this.onStatusChange({
-                status: this.status,
-                error: msg,
-                mode: this.settings.mode || 'paper',
-              });
-            }
+        if (code === ErrorCode.NO_SECURITY_DEFINITION) return;
+
+        const mdType = Number(this.settings.marketDataType) || 3;
+        const isMdEntitlement =
+          MARKET_DATA_INFO_CODES.has(Number(code)) ||
+          /additional subscription|not subscribed|market data/i.test(msg);
+
+        if (isMdEntitlement && mdType === 3) {
+          /* Delayed mode: live entitlement warnings are expected; don't stick on the banner. */
+          return;
+        }
+
+        if (isMdEntitlement && mdType !== 1) {
+          return;
+        }
+
+        this.lastError = msg;
+        if (this.status === 'connected' && reqId != null && this.reqIdToSymbol.has(reqId)) {
+          if (this.onStatusChange) {
+            this.onStatusChange({
+              status: this.status,
+              error: msg,
+              mode: this.settings.mode || 'paper',
+            });
           }
         }
       });
@@ -148,7 +289,8 @@ class IbkrAdapter {
         } catch (_) {
           /* ignore */
         }
-        this._setStatus('connected');
+        this.lastError = null;
+        this._setStatus('connected', null);
         resolve({ status: 'connected', orderId });
       });
 
@@ -275,17 +417,21 @@ class IbkrAdapter {
       this.reqIdToSymbol.clear();
       this.symbolToReqId.clear();
       this.symbolToContractKey.clear();
+      this.symbolToContract.clear();
     }
     this.nextOrderId = null;
+    this._clearBootstrapTimers();
     this._setStatus('disconnected');
     return { status: 'disconnected' };
   }
 
   getConnectionStatus() {
+    const mdType = Number(this.settings.marketDataType) || 3;
     return {
       status: this.status,
       error: this.lastError,
       mode: this.settings.mode || 'paper',
+      marketDataType: mdType,
     };
   }
 
@@ -299,6 +445,27 @@ class IbkrAdapter {
       this.ib.reqMarketDataType(Number.isFinite(mdType) && mdType > 0 ? mdType : 3);
     } catch (_) {
       /* ignore */
+    }
+    this._clearConnectionError();
+    this._resubscribeAllQuotes();
+  }
+
+  _resubscribeAllQuotes() {
+    if (!this.ib || this.status !== 'connected') return;
+    const contracts = [...this.symbolToContract.entries()];
+    if (!contracts.length) return;
+    for (const sym of [...this.symbolToReqId.keys()]) {
+      this._cancelQuoteSubscription(sym);
+    }
+    for (const [sym, contract] of contracts) {
+      const reqId = this.nextReqId++;
+      const ckey = this._contractKey(contract);
+      this.reqIdToSymbol.set(reqId, sym);
+      this.symbolToReqId.set(sym, reqId);
+      this.symbolToContractKey.set(sym, ckey);
+      this.symbolToContract.set(sym, contract);
+      this.ib.reqMktData(reqId, contract, '', false, false);
+      this._scheduleQuoteBootstrap(sym, contract);
     }
   }
 
@@ -340,6 +507,7 @@ class IbkrAdapter {
     this.reqIdToSymbol.delete(reqId);
     this.symbolToReqId.delete(sym);
     this.symbolToContractKey.delete(sym);
+    this.symbolToContract.delete(sym);
   }
 
   subscribeQuotes(symbols) {
@@ -375,10 +543,12 @@ class IbkrAdapter {
       this.reqIdToSymbol.set(reqId, sym);
       this.symbolToReqId.set(sym, reqId);
       this.symbolToContractKey.set(sym, ckey);
+      this.symbolToContract.set(sym, contract);
       if (!this.quotes.has(sym)) {
         this.quotes.set(sym, { symbol: sym });
       }
       this.ib.reqMktData(reqId, contract, '', false, false);
+      this._scheduleQuoteBootstrap(sym, contract);
       subscribed.push(sym);
     }
     return { subscribed };
@@ -389,6 +559,7 @@ class IbkrAdapter {
     for (const sym of [...this.symbolToReqId.keys()]) {
       this._cancelQuoteSubscription(sym);
     }
+    this.symbolToContract.clear();
   }
 
   getQuotes() {
@@ -584,12 +755,15 @@ class IbkrAdapter {
       const duration = options.duration || '1 Y';
       const barSize = options.barSize || '1 day';
       const whatToShow = options.whatToShow || 'TRADES';
+      const useRTH = options.useRTH != null ? options.useRTH : 1;
+      const intraday = isIntradayBarSize(barSize);
       const reqId = this.nextReqId++;
       const bars = [];
 
       const finish = (error = null) => {
         clearTimeout(timer);
         this.ib.removeListener(EventName.historicalData, handler);
+        bars.sort((a, b) => parseBarTimeMs(a.time) - parseBarTimeMs(b.time));
         resolve({
           symbol: contract.symbol,
           bars,
@@ -597,7 +771,10 @@ class IbkrAdapter {
         });
       };
 
-      const timer = setTimeout(() => finish('Historical data request timed out'), 30000);
+      const timer = setTimeout(
+        () => finish('Historical data request timed out'),
+        intraday ? 60000 : 30000,
+      );
 
       const handler = (rid, time, open, high, low, close, volume) => {
         if (rid !== reqId) return;
@@ -630,7 +807,7 @@ class IbkrAdapter {
           duration,
           barSize,
           whatToShow,
-          1,
+          useRTH,
           1,
           false,
         );

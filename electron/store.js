@@ -19,6 +19,12 @@ async function getStore() {
             fmpApiKey: process.env.FMP_API_KEY || '',
             cacheTtlMinutes: 60,
           },
+          agent: {
+            enabled: true,
+            activeProfileId: 'local-ollama',
+            profiles: [],
+            subscription: { plan: 'free' },
+          },
         },
       });
     });
