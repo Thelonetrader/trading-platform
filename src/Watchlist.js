@@ -17,6 +17,7 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
     priority: 'Medium',
     exchange: 'SMART',
     currency: 'USD',
+    tags: '',
   });
 
   const handleChange = (field, value) => {
@@ -28,7 +29,7 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
     const newStocks = [{ ...form, id: Date.now(), addedDate: new Date().toISOString().split('T')[0] }, ...stocks];
     setStocks(newStocks);
     localStorage.setItem('watchlist', JSON.stringify(newStocks));
-    setForm({ ticker: '', name: '', sector: '', buyPrice: '', notes: '', priority: 'Medium', exchange: 'SMART', currency: 'USD' });
+    setForm({ ticker: '', name: '', sector: '', buyPrice: '', notes: '', priority: 'Medium', exchange: 'SMART', currency: 'USD', tags: '' });
     setShowForm(false);
   };
 
@@ -172,6 +173,10 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
                 <option>Low</option>
               </select>
             </div>
+            <div>
+              <label style={labelStyle}>Tags</label>
+              <input placeholder="thesis, dividend (comma-separated)" value={form.tags} onChange={e => handleChange('tags', e.target.value)} style={inputStyle} />
+            </div>
           </div>
           <div style={{ marginBottom: 16 }}>
             <label style={labelStyle}>Notes</label>
@@ -252,6 +257,11 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
                       background: `${priorityColor(stock.priority)}20`,
                       color: priorityColor(stock.priority),
                     }}>{stock.priority}</span>
+                    {stock.tags && String(stock.tags).trim() && (
+                      <span style={{ fontSize: 11, color: '#818cf8' }}>
+                        {String(stock.tags).split(/[,;]+/).map((t) => t.trim()).filter(Boolean).join(' · ')}
+                      </span>
+                    )}
                   </div>
                   <div style={{ display: 'flex', gap: 20, marginBottom: stock.notes ? 8 : 0 }}>
                     {stock.buyPrice && (

@@ -42,4 +42,6 @@ export const DEFAULT_SCREENER_FILTERS = {
   maxChange: '',
   sortBy: 'priority',
   search: '',
+  tagQuery: '',
+  minRank: '',
 };

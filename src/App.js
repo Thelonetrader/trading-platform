@@ -5,6 +5,7 @@ import Portfolio from './Portfolio';
 import Scorecards from './Scorecards';
 import ScorecardLibrary from './ScorecardLibrary';
 import Screener from './Screener';
+import Alerts from './Alerts';
 import CommandBar from './components/CommandBar';
 import QuoteStrip from './components/QuoteStrip';
 import TerminalWorkspace from './components/TerminalWorkspace';
@@ -93,7 +94,7 @@ function App() {
       setCommandMsg('');
 
       if (cmd.type === 'help') {
-        setCommandMsg('Symbol · buy TICKER 10 · sell TICKER 5 · watch TICKER · go watchlist · go screener · go settings');
+        setCommandMsg('Symbol · buy TICKER 10 · sell TICKER 5 · watch TICKER · go watchlist · go screener · go alerts · go settings');
         return;
       }
       if (cmd.type === 'nav') {
@@ -164,6 +165,7 @@ function App() {
     'scorecard',
     'scorecard-library',
     'screener',
+    'alerts',
     'settings',
   ]);
 
@@ -395,6 +397,21 @@ function App() {
                 setScorecardFocus({ ticker: sym, sector: sector || 'tech' });
                 setActivePage('scorecard');
               }}
+            />
+          )}
+          {activePage === 'alerts' && (
+            <Alerts
+              onOpenTerminal={(sym, contract) => {
+                setActiveSymbol(sym);
+                if (contract?.exchange) {
+                  setActiveContract({
+                    exchange: contract.exchange || 'SMART',
+                    currency: contract.currency || 'USD',
+                  });
+                }
+                setActivePage('terminal');
+              }}
+              onOpenScreener={() => setActivePage('screener')}
             />
           )}
           {activePage === 'settings' && (

@@ -9,6 +9,7 @@ import {
 } from './utils/screenerPresets';
 import { SECTORS, getRatingColor } from './scorecards/model';
 import { getBestEvalForTicker, listScorecardEvals } from './scorecards/storage';
+import { computeCustomRank, getRankWeights, parseTags } from './utils/customRank';
 
 const PRIORITIES = ['High', 'Medium', 'Low'];
 const RATING_FILTERS = [
@@ -27,6 +28,7 @@ const JOURNAL_FILTERS = [
 const SORT_OPTIONS = [
   { id: 'priority', label: 'Priority' },
   { id: 'score', label: 'Fundamental score' },
+  { id: 'rank', label: 'Custom rank' },
   { id: 'change', label: 'Day change %' },
   { id: 'ticker', label: 'Ticker A–Z' },
   { id: 'added', label: 'Date added' },
@@ -42,11 +44,12 @@ function sectorFromWatchlistLabel(sectorText) {
   return '';
 }
 
-function buildRows(watchlist, journalIndex) {
+function buildRows(watchlist, journalIndex, weights) {
   return watchlist.map((item) => {
     const ticker = (item.ticker || '').toUpperCase();
     const evalRow = getBestEvalForTicker(ticker);
     const journal = journalIndex.get(ticker);
+    const { score } = computeCustomRank({ watch: item, evalRow, journal, weights });
     return {
       id: item.id,
       ticker,
@@ -55,6 +58,8 @@ function buildRows(watchlist, journalIndex) {
       sectorId: evalRow?.sectorId || sectorFromWatchlistLabel(item.sector),
       priority: item.priority || 'Medium',
       notes: item.notes || '',
+      tags: parseTags(item.tags),
+      customRank: score,
       buyPrice: item.buyPrice,
       addedDate: item.addedDate,
       exchange: item.exchange || 'SMART',
@@ -72,10 +77,15 @@ function filterAndSortRows(rows, filters, quotes) {
   const maxCh = filters.maxChange === '' ? null : parseFloat(filters.maxChange);
   const minAvg = RATING_FILTERS.find((r) => r.id === filters.ratingFilter)?.minAvg ?? 0;
 
+  const minRank = filters.minRank === '' ? null : parseFloat(filters.minRank);
+  const tagQ = (filters.tagQuery || '').trim().toLowerCase();
+
   let filtered = rows.filter((row) => {
     if (!filters.priorityFilter[row.priority]) return false;
     if (q && !row.ticker.includes(q) && !row.name.toUpperCase().includes(q)) return false;
     if (sectorQ && !row.sectorLabel.toLowerCase().includes(sectorQ)) return false;
+    if (tagQ && !row.tags.some((t) => t.toLowerCase().includes(tagQ))) return false;
+    if (minRank != null && !Number.isNaN(minRank) && (row.customRank == null || row.customRank < minRank)) return false;
     if (filters.requireScorecard && !row.eval) return false;
     if (row.eval && row.eval.avg < minAvg) return false;
     if (!row.eval && minAvg > 0) return false;
@@ -96,6 +106,9 @@ function filterAndSortRows(rows, filters, quotes) {
       const sa = a.eval?.avg ?? -1;
       const sb = b.eval?.avg ?? -1;
       return sb - sa;
+    }
+    if (filters.sortBy === 'rank') {
+      return (b.customRank ?? -1) - (a.customRank ?? -1);
     }
     if (filters.sortBy === 'change') {
       const ca = quotes[a.ticker]?.changePct ?? -Infinity;
@@ -126,6 +139,8 @@ export default function Screener({
   const [maxChange, setMaxChange] = useState(DEFAULT_SCREENER_FILTERS.maxChange);
   const [sortBy, setSortBy] = useState(DEFAULT_SCREENER_FILTERS.sortBy);
   const [search, setSearch] = useState(DEFAULT_SCREENER_FILTERS.search);
+  const [tagQuery, setTagQuery] = useState(DEFAULT_SCREENER_FILTERS.tagQuery);
+  const [minRank, setMinRank] = useState(DEFAULT_SCREENER_FILTERS.minRank);
 
   const [presets, setPresets] = useState(() => listScreenerPresets());
   const [selectedPresetId, setSelectedPresetId] = useState('');
@@ -149,13 +164,16 @@ export default function Screener({
     maxChange,
     sortBy,
     search,
+    tagQuery,
+    minRank,
   };
 
   const evalCount = listScorecardEvals().length;
 
   const rows = useMemo(() => {
     const journalIndex = getJournalIndexByTicker();
-    const built = buildRows(watchlistSnapshot, journalIndex);
+    const weights = getRankWeights();
+    const built = buildRows(watchlistSnapshot, journalIndex, weights);
     return filterAndSortRows(
       built,
       {
@@ -168,6 +186,8 @@ export default function Screener({
         maxChange,
         sortBy,
         search,
+        tagQuery,
+        minRank,
       },
       quotes,
     );
@@ -182,7 +202,10 @@ export default function Screener({
     maxChange,
     sortBy,
     search,
+    tagQuery,
+    minRank,
     quotes,
+    refreshKey,
   ]);
 
   const applyFilters = (next) => {
@@ -195,6 +218,8 @@ export default function Screener({
     setMaxChange(next.maxChange ?? '');
     setSortBy(next.sortBy ?? 'priority');
     setSearch(next.search ?? '');
+    setTagQuery(next.tagQuery ?? '');
+    setMinRank(next.minRank ?? '');
   };
 
   const handleLoadPreset = () => {
@@ -426,6 +451,27 @@ export default function Screener({
           </select>
         </div>
         <div>
+          <label style={labelStyle}>Tag contains</label>
+          <input
+            style={inputStyle}
+            placeholder="e.g. thesis"
+            value={tagQuery}
+            onChange={(e) => setTagQuery(e.target.value)}
+          />
+        </div>
+        <div>
+          <label style={labelStyle}>Min custom rank</label>
+          <input
+            style={inputStyle}
+            type="number"
+            min={0}
+            max={100}
+            placeholder="—"
+            value={minRank}
+            onChange={(e) => setMinRank(e.target.value)}
+          />
+        </div>
+        <div>
           <label style={labelStyle}>Sort by</label>
           <select style={inputStyle} value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
             {SORT_OPTIONS.map((o) => (
@@ -516,7 +562,7 @@ export default function Screener({
                   borderRadius: 10,
                   padding: '14px 18px',
                   display: 'grid',
-                  gridTemplateColumns: 'minmax(120px, 1fr) minmax(88px, auto) minmax(80px, auto) minmax(100px, auto) minmax(48px, auto) 1fr auto',
+                  gridTemplateColumns: 'minmax(120px, 1fr) minmax(52px, auto) minmax(88px, auto) minmax(80px, auto) minmax(100px, auto) minmax(48px, auto) 1fr auto',
                   gap: 12,
                   alignItems: 'center',
                 }}
@@ -524,6 +570,9 @@ export default function Screener({
                 <div>
                   <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: 15 }}>{row.ticker}</div>
                   <div style={{ fontSize: 12, color: '#64748b' }}>{row.name || row.sectorLabel || '—'}</div>
+                </div>
+                <div title="Custom rank (Alerts weights)">
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#818cf8' }}>{row.customRank}</span>
                 </div>
                 <div>
                   <span style={{ fontSize: 11, color: priColor, fontWeight: 600 }}>{row.priority}</span>

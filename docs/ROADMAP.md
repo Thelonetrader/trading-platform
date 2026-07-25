@@ -52,12 +52,14 @@ Suggested providers (pick one stack; not implemented yet):
 
 ## Recommended build phases
 
-### Phase 1 — Alerts + ranking (no new paid API required)
+### Phase 1 — Alerts + ranking (no new paid API required) ✅
 
 1. **Alerts** page: rules on watchlist + saved scorecard fields (e.g. rating ≥ Buy, priority High, journal exists).  
 2. **Custom rank score**: weighted blend of scorecard avg, priority, journal recency (user weights in UI).  
 3. **Screener**: sort/filter by custom rank.  
 4. Watchlist **tags** for rule conditions.
+
+Export/import includes `alertRules` and `rankWeights`.
 
 ### Phase 2 — Market data foundation
 

@@ -1,16 +1,18 @@
 import { readJson } from './storageStats';
+import { RANK_WEIGHTS_KEY, getRankWeights } from './customRank';
 
 export const BACKUP_VERSION = 1;
 export const BACKUP_APP_ID = 'trading-platform';
 export const RESEARCH_DATA_IMPORTED_EVENT = 'research-data-imported';
 
-/** localStorage keys included in research export/import */
+/** localStorage keys included in research export/import (array values) */
 export const RESEARCH_STORAGE_KEYS = [
   'watchlist',
   'trades',
   'portfolio',
   'scorecardEvals',
   'screenerPresets',
+  'alertRules',
 ];
 
 function emptyForKey(key) {
@@ -22,6 +24,7 @@ export function buildExportPayload({ includeBroker = false, brokerSettings = nul
   for (const key of RESEARCH_STORAGE_KEYS) {
     data[key] = readJson(key, emptyForKey(key));
   }
+  data.rankWeights = getRankWeights();
 
   const payload = {
     version: BACKUP_VERSION,
@@ -53,6 +56,10 @@ export function validateBackupPayload(raw) {
       throw new Error(`Backup field "${key}" must be an array`);
     }
   }
+  const rw = raw.data.rankWeights;
+  if (rw != null && (typeof rw !== 'object' || Array.isArray(rw))) {
+    throw new Error('Backup field "rankWeights" must be an object');
+  }
   return raw;
 }
 
@@ -65,6 +72,10 @@ function mergeById(existing, incoming) {
     if (item && item.id != null) map.set(String(item.id), item);
   }
   return Array.from(map.values());
+}
+
+function mergeRankWeights(existing, incoming) {
+  return { ...existing, ...incoming };
 }
 
 export function applyResearchImport(payload, mode = 'merge') {
@@ -82,6 +93,16 @@ export function applyResearchImport(payload, mode = 'merge') {
     const existing = readJson(key, []);
     const merged = mergeById(existing, incoming);
     localStorage.setItem(key, JSON.stringify(merged));
+  }
+
+  const incomingWeights = validated.data.rankWeights;
+  if (incomingWeights != null) {
+    if (mode === 'replace') {
+      localStorage.setItem(RANK_WEIGHTS_KEY, JSON.stringify(incomingWeights));
+    } else {
+      const merged = mergeRankWeights(getRankWeights(), incomingWeights);
+      localStorage.setItem(RANK_WEIGHTS_KEY, JSON.stringify(merged));
+    }
   }
 
   return {
@@ -124,6 +145,7 @@ export function summarizeBackup(payload) {
   for (const key of RESEARCH_STORAGE_KEYS) {
     counts[key] = (validated.data[key] || []).length;
   }
+  counts.rankWeights = validated.data.rankWeights ? 1 : 0;
   return {
     exportedAt: validated.exportedAt,
     counts,
