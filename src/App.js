@@ -51,6 +51,7 @@ function App() {
     subscribeSymbols,
     refreshTradingData,
     cancelOrder,
+    fetchFundamentals,
     isElectron,
   } = useTradingApi();
 
@@ -402,6 +403,9 @@ function App() {
               focusTicker={scorecardFocus.ticker}
               focusSector={scorecardFocus.sector}
               onOpenLibrary={() => setActivePage('scorecard-library')}
+              connection={connection}
+              isElectron={isElectron}
+              fetchFundamentals={fetchFundamentals}
             />
           )}
           {activePage === 'scorecard-library' && (

@@ -15,6 +15,7 @@ const noopApi = {
   getOpenOrders: async () => [],
   getPositions: async () => [],
   getAccountSummary: async () => [],
+  getFundamentals: async () => ({ metrics: {}, fieldCount: 0, error: 'Connect via Electron' }),
   onQuote: () => () => {},
   onConnectionStatus: () => () => {},
   onOrderUpdate: () => () => {},
@@ -143,6 +144,16 @@ export function useTradingApi() {
     [api, refreshTradingData],
   );
 
+  const fetchFundamentals = useCallback(
+    async (entry) => {
+      if (!entry?.ticker && !entry?.symbol) {
+        return { metrics: {}, fieldCount: 0, error: 'Missing ticker' };
+      }
+      return api.getFundamentals(entry);
+    },
+    [api],
+  );
+
   return {
     api,
     isElectron: api !== noopApi,
@@ -159,5 +170,6 @@ export function useTradingApi() {
     refreshQuotes,
     refreshTradingData,
     cancelOrder,
+    fetchFundamentals,
   };
 }

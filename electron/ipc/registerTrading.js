@@ -51,6 +51,8 @@ function registerTradingIpc() {
   ipcMain.handle('trading:getPositions', async () => broker.getPositions());
 
   ipcMain.handle('trading:getAccountSummary', async () => broker.getAccountSummary());
+
+  ipcMain.handle('trading:getFundamentals', async (_e, entry) => broker.getFundamentals(entry || {}));
 }
 
 module.exports = { registerTradingIpc, broker };

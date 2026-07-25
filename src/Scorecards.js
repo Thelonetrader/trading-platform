@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   SECTORS,
   calcAvg,
@@ -10,8 +10,21 @@ import {
   getScore,
   mergeMetricValues,
 } from './scorecards/model';
+import { applyFundamentalsToSector, countAppliedMetrics } from './scorecards/applyFundamentals';
 import { getScorecardEval, upsertScorecardEval } from './scorecards/storage';
 import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
+import { readJson } from './utils/storageStats';
+
+function looksLikeTicker(raw) {
+  const s = (raw || '').trim();
+  return /^[A-Za-z][A-Za-z0-9.-]{0,11}$/.test(s);
+}
+
+function entryForTicker(raw) {
+  const sym = (raw || '').trim().toUpperCase();
+  const w = readJson('watchlist', []).find((x) => (x.ticker || '').toUpperCase() === sym);
+  return { ticker: sym, exchange: w?.exchange || 'SMART', currency: w?.currency || 'USD' };
+}
 
 
 const Pip = ({ filled, color }) => (
@@ -61,12 +74,23 @@ const MetricInput = ({ metric, value, onChange, accent }) => {
   );
 };
 
-export default function Scorecards({ focusTicker = '', focusSector = '', onOpenLibrary }) {
+export default function Scorecards({
+  focusTicker = '',
+  focusSector = '',
+  onOpenLibrary,
+  connection,
+  isElectron = false,
+  fetchFundamentals,
+}) {
   const [activeSector, setActiveSector] = useState(
     focusSector && SECTORS[focusSector] ? focusSector : 'core',
   );
   const [compareMode, setCompareMode] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
+  const [fundamentalMsg, setFundamentalMsg] = useState('');
+  const [fundamentalLoading, setFundamentalLoading] = useState(false);
+  const [autoFillIb, setAutoFillIb] = useState(true);
+  const lastFundamentalKey = useRef('');
   const [allValuesA, setAllValuesA] = useState(emptySectorValuesMap);
   const [allValuesB, setAllValuesB] = useState(emptySectorValuesMap);
   const [stockNameA, setStockNameA] = useState(emptySectorNamesMap);
@@ -105,6 +129,61 @@ export default function Scorecards({ focusTicker = '', focusSector = '', onOpenL
       }));
     }
   }, [focusTicker, focusSector]); // eslint-disable-line react-hooks/exhaustive-deps -- load once per navigation focus
+
+  const pullFundamentals = useCallback(
+    async (tickerRaw, sectorId, { force = false } = {}) => {
+      const ticker = (tickerRaw || '').trim();
+      if (!looksLikeTicker(ticker) || !fetchFundamentals) return;
+      if (connection?.status !== 'connected') {
+        setFundamentalMsg('Connect IB in Settings to auto-fill fundamentals');
+        return;
+      }
+
+      const tickerU = ticker.toUpperCase();
+      if (!force && getScorecardEval(tickerU, sectorId)) return;
+
+      const key = `${tickerU}:${sectorId}`;
+      if (!force && lastFundamentalKey.current === key) return;
+
+      setFundamentalLoading(true);
+      setFundamentalMsg('Loading IB fundamentals…');
+      try {
+        const res = await fetchFundamentals(entryForTicker(ticker));
+        const applied = countAppliedMetrics(sectorId, res.metrics);
+        if (applied > 0) {
+          setAllValuesA((prev) => ({
+            ...prev,
+            [sectorId]: applyFundamentalsToSector(sectorId, prev[sectorId], res.metrics),
+          }));
+          lastFundamentalKey.current = key;
+          setFundamentalMsg(`Filled ${applied} metric${applied === 1 ? '' : 's'} from IB (Reuters)`);
+        } else {
+          setFundamentalMsg(res.error || 'No matching ratio fields for this template');
+        }
+      } catch (e) {
+        setFundamentalMsg(e.message || 'Fundamental request failed');
+      } finally {
+        setFundamentalLoading(false);
+        setTimeout(() => setFundamentalMsg(''), 5000);
+      }
+    },
+    [connection?.status, fetchFundamentals],
+  );
+
+  const hasSavedResearch =
+    looksLikeTicker(nameA) && !!getScorecardEval(nameA.trim().toUpperCase(), activeSector);
+
+  useEffect(() => {
+    if (!autoFillIb || compareMode) return;
+    const ticker = (nameA || '').trim();
+    if (!looksLikeTicker(ticker)) return;
+    const tickerU = ticker.toUpperCase();
+    if (getScorecardEval(tickerU, activeSector)) return;
+    const t = setTimeout(() => {
+      pullFundamentals(ticker, activeSector);
+    }, 800);
+    return () => clearTimeout(t);
+  }, [nameA, activeSector, autoFillIb, compareMode, pullFundamentals]);
 
   const handleSaveEval = () => {
     const ticker = (nameA || focusTicker || '').trim();
@@ -218,21 +297,59 @@ export default function Scorecards({ focusTicker = '', focusSector = '', onOpenL
       </div>
 
       {/* Stock Name Inputs */}
-      <div style={{ display: "grid", gridTemplateColumns: compareMode ? "1fr 1fr" : "1fr", gap: 10, marginBottom: 20 }}>
+      <div style={{ display: "grid", gridTemplateColumns: compareMode ? "1fr 1fr" : "1fr", gap: 10, marginBottom: 12 }}>
         <div>
           {compareMode && <div style={{ fontSize: 10, color: sector.accent, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5, fontWeight: 700 }}>Stock A</div>}
-          <input value={nameA} onChange={e => setStockNameA(prev => ({ ...prev, [activeSector]: e.target.value }))}
-            placeholder={compareMode ? "Stock A name / ticker" : `Stock name / ticker (${sector.label})`}
+          <input value={nameA} onChange={e => setStockNameA(prev => ({ ...prev, [activeSector]: e.target.value.toUpperCase() }))}
+            placeholder={compareMode ? "Stock A ticker" : `Ticker (${sector.label})`}
             style={inputStyle} />
         </div>
         {compareMode && (
           <div>
             <div style={{ fontSize: 10, color: "#e879f9", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 5, fontWeight: 700 }}>Stock B</div>
-            <input value={nameB} onChange={e => setStockNameB(prev => ({ ...prev, [activeSector]: e.target.value }))}
-              placeholder="Stock B name / ticker" style={{ ...inputStyle, border: "1px solid #e879f950" }} />
+            <input value={nameB} onChange={e => setStockNameB(prev => ({ ...prev, [activeSector]: e.target.value.toUpperCase() }))}
+              placeholder="Stock B ticker" style={{ ...inputStyle, border: "1px solid #e879f950" }} />
           </div>
         )}
       </div>
+      {!compareMode && isElectron && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 20 }}>
+          <label style={{ fontSize: 12, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input type="checkbox" checked={autoFillIb} onChange={(e) => setAutoFillIb(e.target.checked)} />
+            Auto-fill from IB for new tickers only
+          </label>
+          <button
+            type="button"
+            disabled={fundamentalLoading || !looksLikeTicker(nameA) || connection?.status !== 'connected'}
+            onClick={() => pullFundamentals(nameA, activeSector, { force: true })}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 6,
+              border: '1px solid #1a2035',
+              background: '#0a0f1e',
+              color: connection?.status === 'connected' ? '#818cf8' : '#64748b',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: fundamentalLoading ? 'wait' : 'pointer',
+            }}
+          >
+            {fundamentalLoading ? 'Loading…' : 'Refresh from IB'}
+          </button>
+          {fundamentalMsg && (
+            <span style={{ fontSize: 12, color: fundamentalMsg.includes('Filled') ? '#22c55e' : '#94a3b8' }}>
+              {fundamentalMsg}
+            </span>
+          )}
+          {hasSavedResearch && connection?.status === 'connected' && (
+            <span style={{ fontSize: 11, color: '#64748b' }}>
+              Loaded from research library — use Refresh from IB to replace with live ratios
+            </span>
+          )}
+          {connection?.status !== 'connected' && (
+            <span style={{ fontSize: 11, color: '#64748b' }}>Live prices need IB; fundamentals need IB + Reuters subscription</span>
+          )}
+        </div>
+      )}
 
       {/* Metrics */}
       <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>

@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('trading', {
   getOpenOrders: () => ipcRenderer.invoke('trading:getOpenOrders'),
   getPositions: () => ipcRenderer.invoke('trading:getPositions'),
   getAccountSummary: () => ipcRenderer.invoke('trading:getAccountSummary'),
+  getFundamentals: (entry) => ipcRenderer.invoke('trading:getFundamentals', entry),
   onQuote: (cb) => {
     const handler = (_e, quote) => cb(quote);
     ipcRenderer.on('trading:quote', handler);

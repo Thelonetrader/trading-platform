@@ -6,6 +6,7 @@ const {
   OrderType,
   ErrorCode,
 } = require('@stoqey/ib');
+const { parseIbFundamentalXml, mapRatiosToMetrics } = require('./fundamentalParse');
 
 const TICK_LAST = 4;
 const TICK_CLOSE = 9;
@@ -459,6 +460,68 @@ class IbkrAdapter {
 
   refreshAccountSummary() {
     return this.getAccountSummary();
+  }
+
+  _reqFundamentalReport(contract, reportType) {
+    return new Promise((resolve) => {
+      if (!this.ib || this.status !== 'connected') {
+        resolve('');
+        return;
+      }
+      const reqId = this.nextReqId++;
+      const timer = setTimeout(() => {
+        this.ib.removeListener(EventName.fundamentalData, handler);
+        resolve('');
+      }, 12000);
+
+      const handler = (rid, data) => {
+        if (rid !== reqId) return;
+        clearTimeout(timer);
+        this.ib.removeListener(EventName.fundamentalData, handler);
+        resolve(data || '');
+      };
+
+      this.ib.on(EventName.fundamentalData, handler);
+      try {
+        this.ib.reqFundamentalData(reqId, contract, reportType, []);
+      } catch (_) {
+        clearTimeout(timer);
+        this.ib.removeListener(EventName.fundamentalData, handler);
+        resolve('');
+      }
+    });
+  }
+
+  async getFundamentals(entry) {
+    if (!this.ib || this.status !== 'connected') {
+      return { symbol: '', metrics: {}, fieldCount: 0, error: 'Connect IB in Settings first' };
+    }
+
+    let contract;
+    try {
+      contract = this._contractFromSymbol(entry);
+    } catch (e) {
+      return { symbol: '', metrics: {}, fieldCount: 0, error: e.message || 'Invalid symbol' };
+    }
+
+    const reports = ['ReportSnapshot', 'ReportsFinSummary'];
+    const merged = {};
+    for (const reportType of reports) {
+      const xml = await this._reqFundamentalReport(contract, reportType);
+      Object.assign(merged, parseIbFundamentalXml(xml));
+    }
+
+    const metrics = mapRatiosToMetrics(merged);
+    const fieldCount = Object.keys(metrics).length;
+
+    return {
+      symbol: contract.symbol,
+      metrics,
+      fieldCount,
+      error: fieldCount
+        ? null
+        : 'No ratio data from IB — enable fundamental data for this exchange in TWS / account subscriptions',
+    };
   }
 }
 
