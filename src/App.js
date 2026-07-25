@@ -22,6 +22,7 @@ import {
   getWatchlistSymbols,
   readJson,
 } from './utils/storageStats';
+import { getPortfolioSubscribeSymbols } from './utils/portfolioPricing';
 
 function App() {
   const [activePage, setActivePage] = useState('terminal');
@@ -34,6 +35,7 @@ function App() {
   const [screenerRefreshKey, setScreenerRefreshKey] = useState(0);
   const [terminalResearchVersion, setTerminalResearchVersion] = useState(0);
   const [cancelBusyId, setCancelBusyId] = useState(null);
+  const [portfolioSubTick, setPortfolioSubTick] = useState(0);
 
   const {
     connection,
@@ -96,8 +98,22 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const bump = () => setPortfolioSubTick((t) => t + 1);
+    window.addEventListener(RESEARCH_DATA_IMPORTED_EVENT, bump);
+    window.addEventListener('portfolio-changed', bump);
+    return () => {
+      window.removeEventListener(RESEARCH_DATA_IMPORTED_EVENT, bump);
+      window.removeEventListener('portfolio-changed', bump);
+    };
+  }, []);
+
+  useEffect(() => {
     if (connection.status !== 'connected') return;
     const syms = getWatchlistSymbols();
+    const portfolioSyms = getPortfolioSubscribeSymbols();
+    for (const p of portfolioSyms) {
+      if (!syms.some((s) => s.ticker === p.ticker)) syms.push(p);
+    }
     if (activeSymbol) {
       const inList = syms.some((s) => s.ticker === activeSymbol);
       if (!inList) {
@@ -105,7 +121,7 @@ function App() {
       }
     }
     if (syms.length) subscribeSymbols(syms);
-  }, [connection.status, activeSymbol, activeContract, subscribeSymbols]);
+  }, [connection.status, activeSymbol, activeContract, subscribeSymbols, portfolioSubTick]);
 
   const runCommand = useCallback(
     (input) => {
@@ -356,7 +372,7 @@ function App() {
             />
           )}
           {activePage === 'dashboard' && (
-            <Dashboard onNavigate={setActivePage} portfolioStats={getPortfolioStats()} />
+            <Dashboard onNavigate={setActivePage} portfolioStats={getPortfolioStats(quotes)} />
           )}
           {activePage === 'journal' && <Journal onOpenTerminal={openTerminalForTicker} />}
           {activePage === 'watchlist' && (

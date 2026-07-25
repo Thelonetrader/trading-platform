@@ -1,3 +1,5 @@
+import { effectiveHoldingPrice } from './portfolioPricing';
+
 export function readJson(key, fallback = []) {
   try {
     const raw = localStorage.getItem(key);
@@ -7,11 +9,11 @@ export function readJson(key, fallback = []) {
   }
 }
 
-export function getPortfolioStats() {
+export function getPortfolioStats(quotes = {}) {
   const holdings = readJson('portfolio');
   const totalValue = holdings.reduce((sum, h) => {
     const shares = parseFloat(h.shares) || 0;
-    const price = parseFloat(h.currentPrice || h.avgBuyPrice) || 0;
+    const price = effectiveHoldingPrice(h, quotes);
     return sum + shares * price;
   }, 0);
   const totalCost = holdings.reduce((sum, h) => {

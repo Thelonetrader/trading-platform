@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
+import {
+  effectiveHoldingPrice,
+  holdingUsesLiveQuote,
+} from './utils/portfolioPricing';
 
 function Portfolio({ connection, quotes = {}, onOpenTerminal, subscribeSymbols }) {
   const loadHoldings = () => {
@@ -31,6 +35,7 @@ function Portfolio({ connection, quotes = {}, onOpenTerminal, subscribeSymbols }
     const newHoldings = [{ ...form, id: Date.now(), addedDate: new Date().toISOString().split('T')[0] }, ...holdings];
     setHoldings(newHoldings);
     localStorage.setItem('portfolio', JSON.stringify(newHoldings));
+    window.dispatchEvent(new Event('portfolio-changed'));
     setForm({ ticker: '', name: '', sector: '', shares: '', avgBuyPrice: '', currentPrice: '', dividendYield: '', notes: '' });
     setShowForm(false);
   };
@@ -39,9 +44,10 @@ function Portfolio({ connection, quotes = {}, onOpenTerminal, subscribeSymbols }
     const newHoldings = holdings.filter(h => h.id !== id);
     setHoldings(newHoldings);
     localStorage.setItem('portfolio', JSON.stringify(newHoldings));
+    window.dispatchEvent(new Event('portfolio-changed'));
   };
 
-  const calcValue = (h) => (parseFloat(h.shares) * parseFloat(h.currentPrice || h.avgBuyPrice)).toFixed(2);
+  const calcValue = (h) => (parseFloat(h.shares) * effectiveHoldingPrice(h, quotes)).toFixed(2);
   const calcCost = (h) => (parseFloat(h.shares) * parseFloat(h.avgBuyPrice)).toFixed(2);
   const calcPL = (h) => (parseFloat(calcValue(h)) - parseFloat(calcCost(h))).toFixed(2);
   const calcPLPct = (h) => (((parseFloat(calcValue(h)) - parseFloat(calcCost(h))) / parseFloat(calcCost(h))) * 100).toFixed(2);
@@ -85,7 +91,7 @@ function Portfolio({ connection, quotes = {}, onOpenTerminal, subscribeSymbols }
       const ticker = (h.ticker || '').toUpperCase();
       const shares = parseFloat(h.shares) || 0;
       const avg = parseFloat(h.avgBuyPrice) || 0;
-      const price = parseFloat(h.currentPrice || h.avgBuyPrice) || avg;
+      const price = effectiveHoldingPrice(h, quotes);
       const value = shares * price;
       const cost = shares * avg;
       rows.push({
@@ -99,6 +105,7 @@ function Portfolio({ connection, quotes = {}, onOpenTerminal, subscribeSymbols }
         value,
         pl: value - cost,
         currency: 'GBP',
+        live: holdingUsesLiveQuote(h, quotes),
       });
     });
     brokerPositions.forEach((p, i) => {
@@ -289,7 +296,7 @@ function Portfolio({ connection, quotes = {}, onOpenTerminal, subscribeSymbols }
                   </div>
                   <div style={{ fontSize: 13, color: '#e2e8f0' }}>
                     {row.price.toFixed(2)}
-                    {quotes[row.ticker]?.last != null && row.source === 'IB' && (
+                    {(row.live || (quotes[row.ticker]?.last != null && row.source === 'IB')) && (
                       <span style={{ marginLeft: 4, fontSize: 10, color: '#22c55e' }}>live</span>
                     )}
                   </div>
@@ -367,6 +374,12 @@ function Portfolio({ connection, quotes = {}, onOpenTerminal, subscribeSymbols }
 
       {tab === 'manual' && (
         <>
+      {connection?.status === 'connected' && (
+        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>
+          When IB is connected, <strong style={{ color: '#94a3b8', fontWeight: 600 }}>Current</strong> uses live
+          last price for matching tickers (watchlist exchange/currency helps subscriptions).
+        </div>
+      )}
 
       {/* Stats */}
       <div style={{
@@ -438,7 +451,7 @@ function Portfolio({ connection, quotes = {}, onOpenTerminal, subscribeSymbols }
             </div>
             <div>
               <label style={labelStyle}>Current Price (£)</label>
-              <input type="number" placeholder="0.00" value={form.currentPrice} onChange={e => handleChange('currentPrice', e.target.value)} style={inputStyle} />
+              <input type="number" placeholder="Optional — IB live when connected" value={form.currentPrice} onChange={e => handleChange('currentPrice', e.target.value)} style={inputStyle} />
             </div>
             <div>
               <label style={labelStyle}>Dividend Yield (%)</label>
@@ -520,7 +533,12 @@ function Portfolio({ connection, quotes = {}, onOpenTerminal, subscribeSymbols }
                   <td style={{ padding: '12px 16px', fontSize: 12, color: '#64748b' }}>{h.sector || '—'}</td>
                   <td style={{ padding: '12px 16px', fontSize: 13, color: '#94a3b8' }}>{h.shares}</td>
                   <td style={{ padding: '12px 16px', fontSize: 13, color: '#94a3b8' }}>£{h.avgBuyPrice}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 13, color: '#94a3b8' }}>£{h.currentPrice || h.avgBuyPrice}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13, color: '#94a3b8' }}>
+                    £{effectiveHoldingPrice(h, quotes).toFixed(2)}
+                    {holdingUsesLiveQuote(h, quotes) && (
+                      <span style={{ marginLeft: 6, fontSize: 10, color: '#22c55e', fontWeight: 600 }}>IB</span>
+                    )}
+                  </td>
                   <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: '#f1f5f9' }}>£{calcValue(h)}</td>
                   <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: parseFloat(calcPL(h)) >= 0 ? '#22c55e' : '#ef4444' }}>
                     £{calcPL(h)}
