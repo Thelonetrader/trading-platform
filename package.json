@@ -25,7 +25,9 @@
     "eject": "react-scripts eject",
     "electron": "electron .",
     "electron:dev": "concurrently -k \"npm start\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron:prod": "npm run build && ELECTRON_DEV=0 electron ."
+    "electron:prod": "npm run build && ELECTRON_DEV=0 electron .",
+    "dist": "npm run build && electron-builder --mac",
+    "dist:dir": "npm run build && electron-builder --mac dir"
   },
   "eslintConfig": {
     "extends": [
@@ -46,6 +48,35 @@
     ]
   },
   "devDependencies": {
-    "electron": "^43.2.0"
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "extends": null,
+    "appId": "com.thelonetrader.trading-platform",
+    "productName": "Trading Platform",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "extraMetadata": {
+      "main": "electron.js"
+    },
+    "files": [
+      "build/**/*",
+      "electron/**/*",
+      "electron.js",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "**/*.node"
+    ],
+    "mac": {
+      "category": "public.app-category.finance",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    }
   }
 }

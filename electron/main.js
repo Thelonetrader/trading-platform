@@ -3,6 +3,7 @@ const path = require('path');
 const { registerTradingIpc } = require('./ipc/registerTrading');
 
 const isDev = !app.isPackaged && process.env.ELECTRON_DEV !== '0';
+const appRoot = path.join(__dirname, '..');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -23,7 +24,7 @@ function createWindow() {
   if (isDev) {
     win.loadURL('http://localhost:3000');
   } else {
-    win.loadFile(path.join(__dirname, '..', 'build', 'index.html'));
+    win.loadFile(path.join(appRoot, 'build', 'index.html'));
   }
 }
 
