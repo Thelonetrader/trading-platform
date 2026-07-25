@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
 
 function Journal() {
-    const [trades, setTrades] = useState(() => {
-        const saved = localStorage.getItem('trades');
-        return saved ? JSON.parse(saved) : [];
-      });
+  const loadTrades = () => {
+    const saved = localStorage.getItem('trades');
+    return saved ? JSON.parse(saved) : [];
+  };
+  const [trades, setTrades] = useState(loadTrades);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
@@ -101,6 +103,12 @@ const handleDelete = (id) => {
     marginBottom: 6,
     display: 'block',
   };
+
+  useEffect(() => {
+    const reload = () => setTrades(loadTrades());
+    window.addEventListener(RESEARCH_DATA_IMPORTED_EVENT, reload);
+    return () => window.removeEventListener(RESEARCH_DATA_IMPORTED_EVENT, reload);
+  }, []);
 
   return (
     <div>

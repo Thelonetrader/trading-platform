@@ -10,6 +10,7 @@ import TerminalWorkspace from './components/TerminalWorkspace';
 import Settings from './components/Settings';
 import { useTradingApi } from './hooks/useTradingApi';
 import { parseCommand } from './utils/parseCommand';
+import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
 import {
   formatGbp,
   getJournalCount,
@@ -331,6 +332,10 @@ function App() {
               onSave={saveSettings}
               onConnect={connect}
               onDisconnect={disconnect}
+              onDataImported={() => {
+                setScreenerRefreshKey((k) => k + 1);
+                window.dispatchEvent(new Event(RESEARCH_DATA_IMPORTED_EVENT));
+              }}
             />
           )}
           {!implemented.has(activePage) && (

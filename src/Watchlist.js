@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
 
 function Watchlist({ quotes = {}, onSelectSymbol }) {
-  const [stocks, setStocks] = useState(() => {
+  const loadStocks = () => {
     const saved = localStorage.getItem('watchlist');
     return saved ? JSON.parse(saved) : [];
-  });
+  };
+  const [stocks, setStocks] = useState(loadStocks);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     ticker: '',
@@ -58,6 +60,12 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
     marginBottom: 6,
     display: 'block',
   };
+
+  useEffect(() => {
+    const reload = () => setStocks(loadStocks());
+    window.addEventListener(RESEARCH_DATA_IMPORTED_EVENT, reload);
+    return () => window.removeEventListener(RESEARCH_DATA_IMPORTED_EVENT, reload);
+  }, []);
 
   return (
     <div>

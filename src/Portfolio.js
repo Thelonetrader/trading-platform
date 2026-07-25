@@ -1,13 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
 
 function Portfolio({ connection }) {
+  const loadHoldings = () => {
+    const saved = localStorage.getItem('portfolio');
+    return saved ? JSON.parse(saved) : [];
+  };
   const [tab, setTab] = useState('manual');
   const [brokerPositions, setBrokerPositions] = useState([]);
   const [loadingBroker, setLoadingBroker] = useState(false);
-  const [holdings, setHoldings] = useState(() => {
-    const saved = localStorage.getItem('portfolio');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [holdings, setHoldings] = useState(loadHoldings);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     ticker: '',
@@ -59,6 +61,12 @@ function Portfolio({ connection }) {
       .catch(() => setBrokerPositions([]))
       .finally(() => setLoadingBroker(false));
   }, [tab, connection?.status]);
+
+  useEffect(() => {
+    const reload = () => setHoldings(loadHoldings());
+    window.addEventListener(RESEARCH_DATA_IMPORTED_EVENT, reload);
+    return () => window.removeEventListener(RESEARCH_DATA_IMPORTED_EVENT, reload);
+  }, []);
 
   const tabBtn = (id, label) => (
     <button
