@@ -1,10 +1,8 @@
-/** Manual holding price: IB last → stored current → avg buy */
+import { displayPrice, quoteForSymbol } from './quoteDisplay';
+
+/** IB (or fallback) price for manual holdings when connected. */
 export function liveQuotePrice(quotes, ticker) {
-  const sym = (ticker || '').trim().toUpperCase();
-  if (!sym) return null;
-  const last = quotes?.[sym]?.last;
-  if (last == null || !Number.isFinite(Number(last))) return null;
-  return Number(last);
+  return displayPrice(quoteForSymbol(quotes, ticker));
 }
 
 export function effectiveHoldingPrice(holding, quotes = {}) {

@@ -1,4 +1,5 @@
 import React from 'react';
+import { displayChangePct, displayPrice, normalizeTicker } from '../utils/quoteDisplay';
 
 function fmtPrice(n) {
   if (n == null || Number.isNaN(n)) return '—';
@@ -11,13 +12,18 @@ function fmtChg(pct) {
   return `${sign}${pct.toFixed(2)}%`;
 }
 
-export default function QuoteStrip({ symbols, activeSymbol, quotes, connection }) {
+export default function QuoteStrip({ symbols, activeSymbol, quotes, connection, isElectron = true }) {
   const stripSymbols = symbols.length
-    ? symbols.slice(0, 8).map((s) => (typeof s === 'string' ? s : s.ticker))
+    ? symbols.slice(0, 8).map((s) => normalizeTicker(typeof s === 'string' ? s : s.ticker))
     : ['—'];
 
   const connColor =
     connection.status === 'connected' ? '#22c55e' : connection.status === 'connecting' ? '#f59e0b' : '#64748b';
+
+  const waitingTicks =
+    connection.status === 'connected' &&
+    stripSymbols[0] !== '—' &&
+    stripSymbols.every((sym) => !displayPrice(quotes[sym]));
 
   return (
     <div
@@ -49,9 +55,25 @@ export default function QuoteStrip({ symbols, activeSymbol, quotes, connection }
       >
         IB {connection.mode || 'paper'} · {connection.status}
       </span>
+      {!isElectron && (
+        <span style={{ flexShrink: 0, color: '#f59e0b', fontSize: 11 }}>
+          Run npm run electron:dev for live prices
+        </span>
+      )}
+      {isElectron && connection.status !== 'connected' && (
+        <span style={{ flexShrink: 0, color: '#64748b', fontSize: 11 }}>
+          Settings → Connect IB (TWS: port 7497 paper)
+        </span>
+      )}
+      {waitingTicks && (
+        <span style={{ flexShrink: 0, color: '#64748b', fontSize: 11 }} title={connection.error || ''}>
+          Waiting for market data… (delayed/paper subscriptions)
+        </span>
+      )}
       {stripSymbols.map((sym) => {
         const q = quotes[sym];
-        const chg = q?.changePct;
+        const chg = displayChangePct(q);
+        const px = displayPrice(q);
         const up = chg != null && chg >= 0;
         const active = sym === activeSymbol;
         return (
@@ -69,7 +91,7 @@ export default function QuoteStrip({ symbols, activeSymbol, quotes, connection }
             }}
           >
             <span style={{ fontWeight: 700, color: '#e2e8f0' }}>{sym}</span>
-            <span style={{ color: '#94a3b8' }}>{fmtPrice(q?.last)}</span>
+            <span style={{ color: '#94a3b8' }}>{fmtPrice(px)}</span>
             <span style={{ color: up ? '#22c55e' : '#ef4444', minWidth: 48 }}>{fmtChg(chg)}</span>
           </div>
         );

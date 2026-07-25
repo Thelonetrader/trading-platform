@@ -23,6 +23,7 @@ import {
   readJson,
 } from './utils/storageStats';
 import { getPortfolioSubscribeSymbols } from './utils/portfolioPricing';
+import { quoteForSymbol } from './utils/quoteDisplay';
 
 function App() {
   const [activePage, setActivePage] = useState('terminal');
@@ -50,6 +51,7 @@ function App() {
     subscribeSymbols,
     refreshTradingData,
     cancelOrder,
+    isElectron,
   } = useTradingApi();
 
   useAlertNotifications();
@@ -334,6 +336,7 @@ function App() {
           activeSymbol={activeSymbol}
           quotes={quotes}
           connection={connection}
+          isElectron={isElectron}
         />
 
         <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
@@ -342,7 +345,7 @@ function App() {
               symbol={activeSymbol}
               exchange={activeContract.exchange}
               currency={activeContract.currency}
-              quote={activeSymbol ? quotes[activeSymbol] : null}
+              quote={activeSymbol ? quoteForSymbol(quotes, activeSymbol) : null}
               connection={connection}
               settings={settings}
               orderPreset={orderPreset}

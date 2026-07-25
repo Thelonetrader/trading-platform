@@ -27,6 +27,7 @@ export default function Settings({
     mode: 'paper',
     accountId: '',
     useTws: false,
+    marketDataType: 3,
   });
   const [message, setMessage] = useState(null);
   const [includeBrokerExport, setIncludeBrokerExport] = useState(false);
@@ -191,6 +192,19 @@ export default function Settings({
           }}
         />
         Use TWS ports instead of Gateway
+      </label>
+
+      <label style={{ display: 'block', marginBottom: 16, fontSize: 11, color: '#64748b' }}>
+        Market data type (reconnect after change)
+        <select
+          value={form.marketDataType ?? 3}
+          onChange={(e) => setForm((f) => ({ ...f, marketDataType: Number(e.target.value) }))}
+          style={fieldStyle}
+        >
+          <option value={3}>Delayed — default for paper / no live subscription</option>
+          <option value={4}>Delayed frozen — when market closed</option>
+          <option value={1}>Live — requires IB market data subscription</option>
+        </select>
       </label>
 
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>

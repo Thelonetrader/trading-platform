@@ -70,6 +70,11 @@ class IbkrAdapter {
 
     if (this.ib) {
       try {
+        this.unsubscribeAllQuotes();
+      } catch (_) {
+        /* ignore */
+      }
+      try {
         this.ib.disconnect();
       } catch (_) {
         /* ignore */
@@ -112,6 +117,12 @@ class IbkrAdapter {
       ib.on(EventName.nextValidId, (orderId) => {
         clearTimeout(timeout);
         this.nextOrderId = orderId;
+        const mdType = Number(this.settings.marketDataType);
+        try {
+          ib.reqMarketDataType(Number.isFinite(mdType) && mdType > 0 ? mdType : 3);
+        } catch (_) {
+          /* ignore */
+        }
         this._setStatus('connected');
         resolve({ status: 'connected', orderId });
       });
@@ -122,7 +133,7 @@ class IbkrAdapter {
 
       ib.on(EventName.tickPrice, (reqId, tickType, price) => {
         const symbol = this.reqIdToSymbol.get(reqId);
-        if (!symbol || price === undefined || Number.isNaN(price)) return;
+        if (!symbol || price === undefined || Number.isNaN(price) || price <= 0) return;
         const patch = {};
         if (tickType === TICK_LAST) patch.last = price;
         if (tickType === TICK_CLOSE) patch.close = price;
@@ -132,9 +143,11 @@ class IbkrAdapter {
           const q = this.quotes.get(symbol);
           const close = patch.close ?? q?.close;
           const last = patch.last ?? q?.last;
-          if (last != null && close != null && close !== 0) {
-            patch.change = last - close;
-            patch.changePct = ((last - close) / close) * 100;
+          const ref = last ?? close;
+          const base = close ?? last;
+          if (ref != null && base != null && base !== 0) {
+            patch.change = ref - base;
+            patch.changePct = ((ref - base) / base) * 100;
           }
           this._emitQuote(symbol, patch);
         }
@@ -226,11 +239,19 @@ class IbkrAdapter {
   disconnect() {
     if (this.ib) {
       try {
+        this.unsubscribeAllQuotes();
+      } catch (_) {
+        /* ignore */
+      }
+      try {
         this.ib.disconnect();
       } catch (_) {
         /* ignore */
       }
       this.ib = null;
+    } else {
+      this.reqIdToSymbol.clear();
+      this.symbolToReqId.clear();
     }
     this.nextOrderId = null;
     this._setStatus('disconnected');

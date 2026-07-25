@@ -12,6 +12,8 @@ async function getStore() {
             clientId: Number(process.env.IB_CLIENT_ID) || 1,
             mode: process.env.IB_MODE || 'paper',
             accountId: process.env.IB_ACCOUNT_ID || '',
+            useTws: false,
+            marketDataType: 3,
           },
         },
       });
