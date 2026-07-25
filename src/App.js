@@ -6,6 +6,7 @@ import Scorecards from './Scorecards';
 import News from './News';
 import ScorecardLibrary from './ScorecardLibrary';
 import Screener from './Screener';
+import ChartScanner from './ChartScanner';
 import Alerts from './Alerts';
 import CommandBar from './components/CommandBar';
 import QuoteStrip from './components/QuoteStrip';
@@ -47,6 +48,7 @@ function App() {
   const [portfolioSubTick, setPortfolioSubTick] = useState(0);
   const [scorecardLiveTicker, setScorecardLiveTicker] = useState('');
   const [screenerExtraTickers, setScreenerExtraTickers] = useState([]);
+  const [scannerExtraEntries, setScannerExtraEntries] = useState([]);
 
   const {
     connection,
@@ -127,6 +129,7 @@ function App() {
 
   useEffect(() => {
     if (activePage !== 'screener') setScreenerExtraTickers([]);
+    if (activePage !== 'chartscanner') setScannerExtraEntries([]);
   }, [activePage]);
 
   useEffect(() => {
@@ -156,6 +159,7 @@ function App() {
       extraTickers: [
         ...(scorecardLiveTicker ? [scorecardLiveTicker] : []),
         ...screenerExtraTickers,
+        ...scannerExtraEntries,
       ],
     });
     if (syms.length) subscribeSymbols(syms);
@@ -167,6 +171,7 @@ function App() {
     portfolioSubTick,
     scorecardLiveTicker,
     screenerExtraTickers,
+    scannerExtraEntries,
   ]);
 
   const runCommand = useCallback(
@@ -175,7 +180,7 @@ function App() {
       setCommandMsg('');
 
       if (cmd.type === 'help') {
-        setCommandMsg('Symbol · buy TICKER 10 · sell TICKER 5 · watch TICKER · go watchlist · go screener · go alerts · go settings');
+        setCommandMsg('Symbol · buy TICKER 10 · go chartscanner · go screener · watch TICKER · help');
         return;
       }
       if (cmd.type === 'nav') {
@@ -219,6 +224,7 @@ function App() {
     { id: 'terminal', label: 'Terminal', icon: '▤' },
     { id: 'dashboard', label: 'Dashboard', icon: '⬡' },
     { id: 'screener', label: 'Stock Screener', icon: '◈' },
+    { id: 'chartscanner', label: 'Chart Scanner', icon: '⬢' },
     { id: 'scorecard', label: 'Scorecards', icon: '▣' },
     { id: 'scorecard-library', label: 'Scorecard Library', icon: '▦' },
     { id: 'portfolio', label: 'Portfolio', icon: '◎' },
@@ -238,6 +244,7 @@ function App() {
     'scorecard',
     'scorecard-library',
     'screener',
+    'chartscanner',
     'alerts',
     'settings',
     'news',
@@ -490,6 +497,16 @@ function App() {
               hasFmpKey={hasFmpKey}
               fetchScreenerSnapshots={fetchScreenerSnapshots}
               isElectron={isElectron}
+            />
+          )}
+          {activePage === 'chartscanner' && (
+            <ChartScanner
+              quotes={quotes}
+              connection={connection}
+              fetchHistoricalBars={fetchHistoricalBars}
+              isElectron={isElectron}
+              onOpenTerminal={(sym) => openTerminalForTicker(sym)}
+              onUniverseEntriesChange={setScannerExtraEntries}
             />
           )}
           {activePage === 'alerts' && (
