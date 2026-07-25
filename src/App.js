@@ -3,6 +3,7 @@ import Journal from './Journal';
 import Watchlist from './Watchlist';
 import Portfolio from './Portfolio';
 import Scorecards from './Scorecards';
+import Screener from './Screener';
 import CommandBar from './components/CommandBar';
 import QuoteStrip from './components/QuoteStrip';
 import TerminalWorkspace from './components/TerminalWorkspace';
@@ -23,6 +24,7 @@ function App() {
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandMsg, setCommandMsg] = useState('');
   const [orderPreset, setOrderPreset] = useState(null);
+  const [scorecardFocus, setScorecardFocus] = useState({ ticker: '', sector: '' });
 
   const {
     connection,
@@ -70,7 +72,7 @@ function App() {
       setCommandMsg('');
 
       if (cmd.type === 'help') {
-        setCommandMsg('Symbol · buy TICKER 10 · sell TICKER 5 · watch TICKER · go watchlist · go settings');
+        setCommandMsg('Symbol · buy TICKER 10 · sell TICKER 5 · watch TICKER · go watchlist · go screener · go settings');
         return;
       }
       if (cmd.type === 'nav') {
@@ -138,6 +140,7 @@ function App() {
     'watchlist',
     'portfolio',
     'scorecard',
+    'screener',
     'settings',
   ]);
 
@@ -295,7 +298,24 @@ function App() {
             />
           )}
           {activePage === 'portfolio' && <Portfolio connection={connection} />}
-          {activePage === 'scorecard' && <Scorecards />}
+          {activePage === 'scorecard' && (
+            <Scorecards focusTicker={scorecardFocus.ticker} focusSector={scorecardFocus.sector} />
+          )}
+          {activePage === 'screener' && (
+            <Screener
+              quotes={quotes}
+              connection={connection}
+              onOpenTerminal={(sym, contract) => {
+                setActiveSymbol(sym);
+                if (contract) setActiveContract(contract);
+                setActivePage('terminal');
+              }}
+              onOpenScorecard={(sym, sector) => {
+                setScorecardFocus({ ticker: sym, sector: sector || 'tech' });
+                setActivePage('scorecard');
+              }}
+            />
+          )}
           {activePage === 'settings' && (
             <Settings
               settings={settings}

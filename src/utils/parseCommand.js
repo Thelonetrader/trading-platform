@@ -9,7 +9,7 @@ export function parseCommand(input) {
   }
 
   const navMatch = lower.match(
-    /^go\s+(dashboard|terminal|watchlist|portfolio|journal|scorecard|settings)$/,
+    /^go\s+(dashboard|terminal|watchlist|portfolio|journal|scorecard|screener|settings)$/,
   );
   if (navMatch) {
     const page = navMatch[1] === 'scorecard' ? 'scorecard' : navMatch[1];
