@@ -371,6 +371,7 @@ function App() {
               }}
               onOpenJournal={() => setActivePage('journal')}
               onOpenWatchlist={() => setActivePage('watchlist')}
+              onSymbolChange={openTerminalForTicker}
               researchVersion={terminalResearchVersion}
             />
           )}

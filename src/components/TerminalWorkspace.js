@@ -1,9 +1,104 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import OrderTicket from './OrderTicket';
 import OpenOrdersPanel from './OpenOrdersPanel';
 import { RESEARCH_DATA_IMPORTED_EVENT } from '../utils/dataBackup';
 import { getSymbolResearchContext } from '../utils/symbolResearch';
 import { SECTORS, getRatingColor } from '../scorecards/model';
+import { displayChangePct, displayPrice } from '../utils/quoteDisplay';
+
+function TerminalSymbolField({ symbol, onSymbolChange }) {
+  const inputRef = useRef(null);
+  const [editing, setEditing] = useState(() => !symbol);
+  const [draft, setDraft] = useState(symbol || '');
+
+  useEffect(() => {
+    setDraft(symbol || '');
+    if (!symbol) setEditing(true);
+  }, [symbol]);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  const commit = () => {
+    const upper = draft.trim().toUpperCase();
+    if (upper && onSymbolChange) onSymbolChange(upper);
+    setEditing(false);
+  };
+
+  const cancel = () => {
+    setDraft(symbol || '');
+    setEditing(false);
+  };
+
+  if (editing || !symbol) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value.toUpperCase())}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit();
+            if (e.key === 'Escape') cancel();
+          }}
+          onBlur={() => {
+            if (draft.trim()) commit();
+            else cancel();
+          }}
+          placeholder="Enter ticker (e.g. AAPL)"
+          style={{
+            fontSize: 28,
+            fontWeight: 800,
+            color: '#f8fafc',
+            background: '#060b16',
+            border: '1px solid #6366f1',
+            borderRadius: 8,
+            padding: '8px 12px',
+            width: '100%',
+            maxWidth: 280,
+            outline: 'none',
+            letterSpacing: '0.02em',
+          }}
+          aria-label="Ticker symbol"
+        />
+        <span style={{ fontSize: 11, color: '#64748b' }}>Enter to load · Esc to cancel · ⌘K also works</span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      title="Click to change symbol"
+      style={{
+        marginTop: 8,
+        padding: 0,
+        border: 'none',
+        background: 'none',
+        cursor: 'pointer',
+        textAlign: 'left',
+        borderRadius: 6,
+      }}
+    >
+      <span
+        style={{
+          fontSize: 32,
+          fontWeight: 800,
+          color: '#f8fafc',
+          borderBottom: '2px dashed #334155',
+        }}
+      >
+        {symbol}
+      </span>
+      <span style={{ display: 'block', fontSize: 11, color: '#6366f1', marginTop: 4, fontWeight: 600 }}>
+        Click to change symbol
+      </span>
+    </button>
+  );
+}
 
 function ResearchCard({ title, children, action }) {
   return (
@@ -59,6 +154,7 @@ export default function TerminalWorkspace({
   onOpenScorecard,
   onOpenJournal,
   onOpenWatchlist,
+  onSymbolChange,
   researchVersion = 0,
 }) {
   const [research, setResearch] = useState(null);
@@ -82,6 +178,9 @@ export default function TerminalWorkspace({
   const ratingColor =
     scorecard && sectorMeta ? getRatingColor(scorecard.avg, sectorMeta.accent) : '#64748b';
 
+  const px = displayPrice(quote);
+  const chg = displayChangePct(quote);
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 16, minHeight: 420, alignItems: 'stretch' }}>
@@ -97,18 +196,18 @@ export default function TerminalWorkspace({
             <div style={{ fontSize: 11, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
               Active symbol
             </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 32, fontWeight: 800, color: '#f8fafc' }}>{symbol || '—'}</span>
-              {watch?.name && (
-                <span style={{ fontSize: 16, color: '#94a3b8' }}>{watch.name}</span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+              <TerminalSymbolField symbol={symbol} onSymbolChange={onSymbolChange} />
+              {symbol && watch?.name && (
+                <span style={{ fontSize: 16, color: '#94a3b8', alignSelf: 'center' }}>{watch.name}</span>
               )}
-              {quote?.last != null && (
-                <span style={{ fontSize: 20, color: '#e2e8f0' }}>{Number(quote.last).toFixed(2)}</span>
+              {symbol && px != null && (
+                <span style={{ fontSize: 20, color: '#e2e8f0', alignSelf: 'center' }}>{px.toFixed(2)}</span>
               )}
-              {quote?.changePct != null && (
-                <span style={{ color: quote.changePct >= 0 ? '#22c55e' : '#ef4444' }}>
-                  {quote.changePct >= 0 ? '+' : ''}
-                  {quote.changePct.toFixed(2)}%
+              {symbol && chg != null && (
+                <span style={{ color: chg >= 0 ? '#22c55e' : '#ef4444', alignSelf: 'center' }}>
+                  {chg >= 0 ? '+' : ''}
+                  {chg.toFixed(2)}%
                 </span>
               )}
             </div>
@@ -141,7 +240,7 @@ export default function TerminalWorkspace({
                 lineHeight: 1.6,
               }}
             >
-              Pick a symbol from Watchlist or Screener, or press ⌘K and type a ticker.
+              Pick a symbol above, from Watchlist or Screener, or press ⌘K.
             </div>
           ) : (
             <div
