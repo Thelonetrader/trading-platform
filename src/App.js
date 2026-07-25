@@ -28,6 +28,7 @@ function App() {
   const [orderPreset, setOrderPreset] = useState(null);
   const [scorecardFocus, setScorecardFocus] = useState({ ticker: '', sector: '' });
   const [screenerRefreshKey, setScreenerRefreshKey] = useState(0);
+  const [terminalResearchVersion, setTerminalResearchVersion] = useState(0);
   const [cancelBusyId, setCancelBusyId] = useState(null);
 
   const {
@@ -55,6 +56,9 @@ function App() {
   useEffect(() => {
     if (activePage === 'screener') {
       setScreenerRefreshKey((k) => k + 1);
+    }
+    if (activePage === 'terminal') {
+      setTerminalResearchVersion((v) => v + 1);
     }
   }, [activePage]);
 
@@ -317,6 +321,13 @@ function App() {
                 setOrderPreset(null);
                 refreshTradingData();
               }}
+              onOpenScorecard={(sym, sector) => {
+                setScorecardFocus({ ticker: sym, sector: sector || 'tech' });
+                setActivePage('scorecard');
+              }}
+              onOpenJournal={() => setActivePage('journal')}
+              onOpenWatchlist={() => setActivePage('watchlist')}
+              researchVersion={terminalResearchVersion}
             />
           )}
           {activePage === 'dashboard' && (
