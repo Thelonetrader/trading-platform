@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
+import JournalCalendar from './components/JournalCalendar';
 
 function Journal({ onOpenTerminal }) {
   const loadTrades = () => {
@@ -7,6 +8,7 @@ function Journal({ onOpenTerminal }) {
     return saved ? JSON.parse(saved) : [];
   };
   const [trades, setTrades] = useState(loadTrades);
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({
@@ -82,6 +84,11 @@ const handleDelete = (id) => {
   const totalPL = trades.reduce((sum, t) => sum + (parseFloat(t.pl) || 0), 0);
   const winners = trades.filter(t => parseFloat(t.pl) > 0).length;
   const winRate = trades.length > 0 ? ((winners / trades.length) * 100).toFixed(0) : 0;
+
+  const visibleTrades = useMemo(() => {
+    if (!selectedCalendarDate) return trades;
+    return trades.filter((t) => (t.date || '').slice(0, 10) === selectedCalendarDate);
+  }, [trades, selectedCalendarDate]);
 
   const inputStyle = {
     background: '#060b16',
@@ -164,6 +171,12 @@ const handleDelete = (id) => {
           </div>
         ))}
       </div>
+
+      <JournalCalendar
+        trades={trades}
+        selectedDate={selectedCalendarDate}
+        onSelectDate={setSelectedCalendarDate}
+      />
 
       {/* Log Trade Form */}
       {showForm && (
@@ -285,6 +298,33 @@ const handleDelete = (id) => {
           <div style={{ fontSize: 16, fontWeight: 600, color: '#475569', marginBottom: 6 }}>No trades logged yet</div>
           <div style={{ fontSize: 13 }}>Click "Log Trade" to record your first trade</div>
         </div>
+      ) : visibleTrades.length === 0 ? (
+        <div
+          style={{
+            background: '#0a0f1e',
+            border: '1px solid #1a2035',
+            borderRadius: 12,
+            padding: 32,
+            textAlign: 'center',
+            color: '#64748b',
+            fontSize: 13,
+          }}
+        >
+          No trades on {selectedCalendarDate}.{' '}
+          <button
+            type="button"
+            onClick={() => setSelectedCalendarDate(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#818cf8',
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+          >
+            Show all
+          </button>
+        </div>
       ) : (
         <div style={{
           background: '#0a0f1e',
@@ -292,6 +332,18 @@ const handleDelete = (id) => {
           borderRadius: 12,
           overflow: 'hidden',
         }}>
+          {selectedCalendarDate && (
+            <div
+              style={{
+                padding: '10px 16px',
+                borderBottom: '1px solid #1a2035',
+                fontSize: 12,
+                color: '#94a3b8',
+              }}
+            >
+              Showing trades on <strong style={{ color: '#e2e8f0' }}>{selectedCalendarDate}</strong>
+            </div>
+          )}
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #1a2035' }}>
@@ -309,7 +361,7 @@ const handleDelete = (id) => {
               </tr>
             </thead>
             <tbody>
-              {trades.map((trade, i) => (
+              {visibleTrades.map((trade, i) => (
                 <tr key={trade.id} style={{
                   borderBottom: '1px solid #0f172a',
                   background: i % 2 === 0 ? 'transparent' : '#060b1640',
