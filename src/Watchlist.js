@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-function Watchlist() {
+function Watchlist({ quotes = {}, onSelectSymbol }) {
   const [stocks, setStocks] = useState(() => {
     const saved = localStorage.getItem('watchlist');
     return saved ? JSON.parse(saved) : [];
@@ -13,6 +13,8 @@ function Watchlist() {
     buyPrice: '',
     notes: '',
     priority: 'Medium',
+    exchange: 'SMART',
+    currency: 'USD',
   });
 
   const handleChange = (field, value) => {
@@ -24,7 +26,7 @@ function Watchlist() {
     const newStocks = [{ ...form, id: Date.now(), addedDate: new Date().toISOString().split('T')[0] }, ...stocks];
     setStocks(newStocks);
     localStorage.setItem('watchlist', JSON.stringify(newStocks));
-    setForm({ ticker: '', name: '', sector: '', buyPrice: '', notes: '', priority: 'Medium' });
+    setForm({ ticker: '', name: '', sector: '', buyPrice: '', notes: '', priority: 'Medium', exchange: 'SMART', currency: 'USD' });
     setShowForm(false);
   };
 
@@ -147,6 +149,14 @@ function Watchlist() {
               <input type="number" placeholder="0.00" value={form.buyPrice} onChange={e => handleChange('buyPrice', e.target.value)} style={inputStyle} />
             </div>
             <div>
+              <label style={labelStyle}>Exchange (IB)</label>
+              <input placeholder="SMART or LSE" value={form.exchange} onChange={e => handleChange('exchange', e.target.value.toUpperCase())} style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Currency</label>
+              <input placeholder="USD / GBP" value={form.currency} onChange={e => handleChange('currency', e.target.value.toUpperCase())} style={inputStyle} />
+            </div>
+            <div>
               <label style={labelStyle}>Priority</label>
               <select value={form.priority} onChange={e => handleChange('priority', e.target.value)} style={inputStyle}>
                 <option>High</option>
@@ -196,7 +206,10 @@ function Watchlist() {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {stocks.map(stock => (
+          {stocks.map(stock => {
+            const sym = (stock.ticker || '').toUpperCase();
+            const q = quotes[sym];
+            return (
             <div key={stock.id} style={{
               background: '#0a0f1e',
               border: '1px solid #1a2035',
@@ -238,6 +251,16 @@ function Watchlist() {
                         Target: <span style={{ color: '#22c55e', fontWeight: 600 }}>£{stock.buyPrice}</span>
                       </div>
                     )}
+                    {q?.last != null && (
+                      <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                        Last: <span style={{ color: '#f1f5f9', fontWeight: 600 }}>{Number(q.last).toFixed(2)}</span>
+                        {q.changePct != null && (
+                          <span style={{ marginLeft: 8, color: q.changePct >= 0 ? '#22c55e' : '#ef4444' }}>
+                            {q.changePct >= 0 ? '+' : ''}{q.changePct.toFixed(2)}%
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <div style={{ fontSize: 12, color: '#334155' }}>Added: {stock.addedDate}</div>
                   </div>
                   {stock.notes && (
@@ -245,13 +268,22 @@ function Watchlist() {
                   )}
                 </div>
               </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                {onSelectSymbol && (
+                  <button type="button" onClick={() => onSelectSymbol(sym, { exchange: stock.exchange || 'SMART', currency: stock.currency || 'USD' })} style={{
+                    padding: '4px 10px', borderRadius: 5, border: '1px solid #334155',
+                    background: 'transparent', color: '#6366f1', fontSize: 11,
+                    cursor: 'pointer', fontWeight: 600,
+                  }}>Terminal</button>
+                )}
               <button onClick={() => handleDelete(stock.id)} style={{
                 padding: '4px 10px', borderRadius: 5, border: '1px solid #1a2035',
                 background: 'transparent', color: '#ef4444', fontSize: 11,
                 cursor: 'pointer', fontWeight: 600, flexShrink: 0,
               }}>Remove</button>
+              </div>
             </div>
-          ))}
+          );})}
         </div>
       )}
     </div>

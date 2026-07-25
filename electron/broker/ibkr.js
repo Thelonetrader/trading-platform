@@ -1,0 +1,368 @@
+const {
+  IBApi,
+  EventName,
+  SecType,
+  OrderAction,
+  OrderType,
+  ErrorCode,
+} = require('@stoqey/ib');
+
+const TICK_LAST = 4;
+const TICK_CLOSE = 9;
+const TICK_BID = 1;
+const TICK_ASK = 2;
+
+class IbkrAdapter {
+  constructor() {
+    this.ib = null;
+    this.status = 'disconnected';
+    this.lastError = null;
+    this.nextOrderId = null;
+    this.quotes = new Map();
+    this.reqIdToSymbol = new Map();
+    this.symbolToReqId = new Map();
+    this.nextReqId = 1000;
+    this.openOrders = [];
+    this.positions = [];
+    this.accountSummary = [];
+    this.managedAccounts = [];
+    this.onQuote = null;
+    this.onStatusChange = null;
+    this.onOrderUpdate = null;
+    this.settings = {};
+  }
+
+  setCallbacks({ onQuote, onStatusChange, onOrderUpdate }) {
+    this.onQuote = onQuote;
+    this.onStatusChange = onStatusChange;
+    this.onOrderUpdate = onOrderUpdate;
+  }
+
+  _setStatus(status, error = null) {
+    this.status = status;
+    this.lastError = error;
+    if (this.onStatusChange) {
+      this.onStatusChange({ status, error });
+    }
+  }
+
+  _emitQuote(symbol, patch) {
+    const prev = this.quotes.get(symbol) || { symbol };
+    const next = { ...prev, ...patch, updatedAt: Date.now() };
+    this.quotes.set(symbol, next);
+    if (this.onQuote) {
+      this.onQuote(next);
+    }
+  }
+
+  connect(settings) {
+    if (this.ib && this.status === 'connected') {
+      return Promise.resolve({ status: 'connected' });
+    }
+
+    this.settings = settings || {};
+    const host = settings.host || '127.0.0.1';
+    const port = Number(settings.port) || 4002;
+    const clientId = Number(settings.clientId) || 1;
+
+    if (this.ib) {
+      try {
+        this.ib.disconnect();
+      } catch (_) {
+        /* ignore */
+      }
+      this.ib = null;
+    }
+
+    this._setStatus('connecting');
+
+    return new Promise((resolve, reject) => {
+      const ib = new IBApi({ host, port, clientId });
+      this.ib = ib;
+
+      const fail = (err) => {
+        this._setStatus('error', err?.message || String(err));
+        reject(err);
+      };
+
+      const timeout = setTimeout(() => {
+        fail(new Error('Connection timed out — is IB Gateway running?'));
+      }, 15000);
+
+      ib.on(EventName.connected, () => {
+        /* socket open */
+      });
+
+      ib.on(EventName.error, (err, code) => {
+        if (code === ErrorCode.CONNECT_FAIL) {
+          clearTimeout(timeout);
+          fail(err);
+        } else if (code !== ErrorCode.NO_SECURITY_DEFINITION) {
+          this.lastError = err?.message || String(err);
+        }
+      });
+
+      ib.on(EventName.disconnected, () => {
+        this._setStatus('disconnected');
+      });
+
+      ib.on(EventName.nextValidId, (orderId) => {
+        clearTimeout(timeout);
+        this.nextOrderId = orderId;
+        this._setStatus('connected');
+        resolve({ status: 'connected', orderId });
+      });
+
+      ib.on(EventName.managedAccounts, (accounts) => {
+        this.managedAccounts = accounts.split(',').filter(Boolean);
+      });
+
+      ib.on(EventName.tickPrice, (reqId, tickType, price) => {
+        const symbol = this.reqIdToSymbol.get(reqId);
+        if (!symbol || price === undefined || Number.isNaN(price)) return;
+        const patch = {};
+        if (tickType === TICK_LAST) patch.last = price;
+        if (tickType === TICK_CLOSE) patch.close = price;
+        if (tickType === TICK_BID) patch.bid = price;
+        if (tickType === TICK_ASK) patch.ask = price;
+        if (Object.keys(patch).length) {
+          const q = this.quotes.get(symbol);
+          const close = patch.close ?? q?.close;
+          const last = patch.last ?? q?.last;
+          if (last != null && close != null && close !== 0) {
+            patch.change = last - close;
+            patch.changePct = ((last - close) / close) * 100;
+          }
+          this._emitQuote(symbol, patch);
+        }
+      });
+
+      ib.on(EventName.openOrder, (orderId, contract, order, orderState) => {
+        const entry = {
+          orderId,
+          symbol: contract.symbol,
+          action: order.action,
+          totalQuantity: order.totalQuantity,
+          orderType: order.orderType,
+          lmtPrice: order.lmtPrice,
+          status: orderState.status,
+        };
+        const idx = this.openOrders.findIndex((o) => o.orderId === orderId);
+        if (idx >= 0) this.openOrders[idx] = entry;
+        else this.openOrders.push(entry);
+        if (this.onOrderUpdate) this.onOrderUpdate({ type: 'openOrder', order: entry });
+      });
+
+      ib.on(EventName.orderStatus, (orderId, status) => {
+        const order = this.openOrders.find((o) => o.orderId === orderId);
+        if (order) order.status = status;
+        if (this.onOrderUpdate) {
+          this.onOrderUpdate({ type: 'orderStatus', orderId, status });
+        }
+      });
+
+      ib.on(EventName.openOrderEnd, () => {
+        if (this.onOrderUpdate) {
+          this.onOrderUpdate({ type: 'openOrderEnd', orders: [...this.openOrders] });
+        }
+      });
+
+      ib.on(EventName.position, (account, contract, pos, avgCost) => {
+        const entry = {
+          account,
+          symbol: contract.symbol,
+          secType: contract.secType,
+          currency: contract.currency,
+          exchange: contract.exchange,
+          position: pos,
+          avgCost,
+        };
+        const idx = this.positions.findIndex(
+          (p) => p.symbol === entry.symbol && p.account === entry.account,
+        );
+        if (idx >= 0) this.positions[idx] = entry;
+        else this.positions.push(entry);
+      });
+
+      ib.on(EventName.positionEnd, () => {
+        if (this.onOrderUpdate) {
+          this.onOrderUpdate({ type: 'positionEnd', positions: [...this.positions] });
+        }
+      });
+
+      ib.on(EventName.accountSummary, (reqId, account, tag, value, currency) => {
+        this.accountSummary.push({ account, tag, value, currency });
+      });
+
+      ib.on(EventName.accountSummaryEnd, () => {
+        if (this.onOrderUpdate) {
+          this.onOrderUpdate({ type: 'accountSummaryEnd', summary: [...this.accountSummary] });
+        }
+      });
+
+      ib.connect();
+      ib.reqIds();
+    });
+  }
+
+  disconnect() {
+    if (this.ib) {
+      try {
+        this.ib.disconnect();
+      } catch (_) {
+        /* ignore */
+      }
+      this.ib = null;
+    }
+    this.nextOrderId = null;
+    this._setStatus('disconnected');
+    return { status: 'disconnected' };
+  }
+
+  getConnectionStatus() {
+    return {
+      status: this.status,
+      error: this.lastError,
+      mode: this.settings.mode || 'paper',
+    };
+  }
+
+  _contractFromSymbol(entry) {
+    const symbol = typeof entry === 'string' ? entry : entry.symbol;
+    const exchange = (typeof entry === 'object' && entry.exchange) || 'SMART';
+    const currency = (typeof entry === 'object' && entry.currency) || 'USD';
+    return {
+      symbol: symbol.toUpperCase(),
+      secType: SecType.STK,
+      exchange,
+      currency,
+    };
+  }
+
+  subscribeQuotes(symbols) {
+    if (!this.ib || this.status !== 'connected') {
+      return { subscribed: [] };
+    }
+
+    const subscribed = [];
+    for (const entry of symbols) {
+      const contract = this._contractFromSymbol(entry);
+      const sym = contract.symbol;
+      if (this.symbolToReqId.has(sym)) {
+        subscribed.push(sym);
+        continue;
+      }
+      const reqId = this.nextReqId++;
+      this.reqIdToSymbol.set(reqId, sym);
+      this.symbolToReqId.set(sym, reqId);
+      if (!this.quotes.has(sym)) {
+        this.quotes.set(sym, { symbol: sym });
+      }
+      this.ib.reqMktData(reqId, contract, '', false, false);
+      subscribed.push(sym);
+    }
+    return { subscribed };
+  }
+
+  unsubscribeAllQuotes() {
+    if (!this.ib) return;
+    for (const [sym, reqId] of this.symbolToReqId.entries()) {
+      try {
+        this.ib.cancelMktData(reqId);
+      } catch (_) {
+        /* ignore */
+      }
+      this.reqIdToSymbol.delete(reqId);
+      this.symbolToReqId.delete(sym);
+    }
+  }
+
+  getQuotes() {
+    return Object.fromEntries(this.quotes);
+  }
+
+  placeOrder({ symbol, side, quantity, orderType, limitPrice, tif, exchange, currency }) {
+    if (!this.ib || this.status !== 'connected' || this.nextOrderId == null) {
+      throw new Error('Not connected to IB Gateway');
+    }
+
+    const orderId = this.nextOrderId++;
+    const contract = this._contractFromSymbol({ symbol, exchange, currency });
+    const action = side === 'SELL' ? OrderAction.SELL : OrderAction.BUY;
+    const type = orderType === 'LMT' ? OrderType.LMT : OrderType.MKT;
+
+    const order = {
+      orderId,
+      action,
+      orderType: type,
+      totalQuantity: Number(quantity),
+      tif: tif || 'DAY',
+    };
+
+    if (type === OrderType.LMT && limitPrice != null) {
+      order.lmtPrice = Number(limitPrice);
+    }
+
+    const accountId = this.settings.accountId;
+    if (accountId) order.account = accountId;
+
+    this.ib.placeOrder(orderId, contract, order);
+    return { orderId, symbol: contract.symbol, action, orderType: type, quantity: order.totalQuantity };
+  }
+
+  cancelOrder(orderId) {
+    if (!this.ib || this.status !== 'connected') {
+      throw new Error('Not connected to IB Gateway');
+    }
+    this.ib.cancelOrder(Number(orderId));
+    return { cancelled: orderId };
+  }
+
+  getOpenOrders() {
+    if (!this.ib || this.status !== 'connected') {
+      return [];
+    }
+    this.openOrders = [];
+    this.ib.reqAllOpenOrders();
+    return [...this.openOrders];
+  }
+
+  refreshOpenOrders() {
+    if (!this.ib || this.status !== 'connected') return;
+    this.openOrders = [];
+    this.ib.reqAllOpenOrders();
+  }
+
+  getPositions() {
+    if (!this.ib || this.status !== 'connected') {
+      return [];
+    }
+    this.positions = [];
+    this.ib.reqPositions();
+    return [...this.positions];
+  }
+
+  refreshPositions() {
+    if (!this.ib || this.status !== 'connected') return;
+    this.positions = [];
+    this.ib.reqPositions();
+  }
+
+  getAccountSummary() {
+    if (!this.ib || this.status !== 'connected') {
+      return [];
+    }
+    this.accountSummary = [];
+    const reqId = 9001;
+    this.ib.reqAccountSummary(reqId, 'All', 'NetLiquidation,TotalCashValue,BuyingPower,GrossPositionValue');
+    return [...this.accountSummary];
+  }
+
+  refreshAccountSummary() {
+    if (!this.ib || this.status !== 'connected') return;
+    this.accountSummary = [];
+    this.ib.reqAccountSummary(9001, 'All', 'NetLiquidation,TotalCashValue,BuyingPower,GrossPositionValue');
+  }
+}
+
+module.exports = { IbkrAdapter };

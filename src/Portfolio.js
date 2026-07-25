@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-function Portfolio() {
+function Portfolio({ connection }) {
+  const [tab, setTab] = useState('manual');
+  const [brokerPositions, setBrokerPositions] = useState([]);
+  const [loadingBroker, setLoadingBroker] = useState(false);
   const [holdings, setHoldings] = useState(() => {
     const saved = localStorage.getItem('portfolio');
     return saved ? JSON.parse(saved) : [];
@@ -47,6 +50,35 @@ function Portfolio() {
   const totalPL = (totalValue - totalCost).toFixed(2);
   const totalIncome = holdings.reduce((sum, h) => sum + parseFloat(calcAnnualIncome(h)), 0).toFixed(2);
 
+  useEffect(() => {
+    if (tab !== 'broker' || connection?.status !== 'connected' || !window.trading) return;
+    setLoadingBroker(true);
+    window.trading
+      .getPositions()
+      .then((rows) => setBrokerPositions(rows.filter((p) => p.position !== 0)))
+      .catch(() => setBrokerPositions([]))
+      .finally(() => setLoadingBroker(false));
+  }, [tab, connection?.status]);
+
+  const tabBtn = (id, label) => (
+    <button
+      type="button"
+      onClick={() => setTab(id)}
+      style={{
+        padding: '8px 16px',
+        borderRadius: 8,
+        border: 'none',
+        cursor: 'pointer',
+        fontWeight: 600,
+        fontSize: 13,
+        background: tab === id ? '#6366f1' : '#1a2035',
+        color: tab === id ? '#fff' : '#64748b',
+      }}
+    >
+      {label}
+    </button>
+  );
+
   const inputStyle = {
     background: '#060b16',
     border: '1px solid #1a2035',
@@ -89,10 +121,56 @@ function Portfolio() {
           fontSize: 13,
           fontWeight: 600,
           cursor: 'pointer',
+          display: tab === 'manual' ? 'block' : 'none',
         }}>
           {showForm ? '✕ Cancel' : '+ Add Holding'}
         </button>
       </div>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        {tabBtn('manual', 'Manual holdings')}
+        {tabBtn('broker', 'IB positions')}
+      </div>
+
+      {tab === 'broker' && (
+        <div style={{ marginBottom: 24 }}>
+          {connection?.status !== 'connected' ? (
+            <div style={{ color: '#f59e0b', fontSize: 13 }}>Connect IB Gateway in Settings to view broker positions.</div>
+          ) : loadingBroker ? (
+            <div style={{ color: '#64748b', fontSize: 13 }}>Loading positions…</div>
+          ) : brokerPositions.length === 0 ? (
+            <div style={{ color: '#64748b', fontSize: 13 }}>No open IB positions.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {brokerPositions.map((p, i) => (
+                <div
+                  key={`${p.symbol}-${i}`}
+                  style={{
+                    background: '#0a0f1e',
+                    border: '1px solid #1a2035',
+                    borderRadius: 10,
+                    padding: '14px 18px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div>
+                    <span style={{ fontWeight: 800, color: '#f1f5f9' }}>{p.symbol}</span>
+                    <span style={{ marginLeft: 10, fontSize: 12, color: '#64748b' }}>{p.exchange}</span>
+                  </div>
+                  <div style={{ textAlign: 'right', fontSize: 13 }}>
+                    <div style={{ color: '#e2e8f0' }}>{p.position} sh</div>
+                    <div style={{ color: '#64748b', fontSize: 12 }}>Avg {Number(p.avgCost).toFixed(2)} {p.currency}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'manual' && (
+        <>
 
       {/* Stats */}
       <div style={{
@@ -269,6 +347,8 @@ function Portfolio() {
             </tbody>
           </table>
         </div>
+      )}
+        </>
       )}
     </div>
   );
