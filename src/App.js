@@ -7,6 +7,7 @@ import Screener from './Screener';
 import CommandBar from './components/CommandBar';
 import QuoteStrip from './components/QuoteStrip';
 import TerminalWorkspace from './components/TerminalWorkspace';
+import AccountStrip from './components/AccountStrip';
 import Settings from './components/Settings';
 import { useTradingApi } from './hooks/useTradingApi';
 import { parseCommand } from './utils/parseCommand';
@@ -27,15 +28,21 @@ function App() {
   const [orderPreset, setOrderPreset] = useState(null);
   const [scorecardFocus, setScorecardFocus] = useState({ ticker: '', sector: '' });
   const [screenerRefreshKey, setScreenerRefreshKey] = useState(0);
+  const [cancelBusyId, setCancelBusyId] = useState(null);
 
   const {
     connection,
     quotes,
     settings,
+    openOrders,
+    accountSummary,
+    tradingRefreshing,
     connect,
     disconnect,
     saveSettings,
     subscribeSymbols,
+    refreshTradingData,
+    cancelOrder,
   } = useTradingApi();
 
   const watchlistSymbols = getWatchlistSymbols();
@@ -234,7 +241,13 @@ function App() {
           <div style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9' }}>
             {navItems.find((n) => n.id === activePage)?.label}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <AccountStrip
+              connection={connection}
+              accountSummary={accountSummary}
+              onRefresh={refreshTradingData}
+              refreshing={tradingRefreshing}
+            />
             <button
               type="button"
               onClick={() => setCommandOpen(true)}
@@ -288,7 +301,22 @@ function App() {
               connection={connection}
               settings={settings}
               orderPreset={orderPreset}
-              onOrderPlaced={() => setOrderPreset(null)}
+              openOrders={openOrders}
+              onRefreshOrders={refreshTradingData}
+              ordersRefreshing={tradingRefreshing}
+              cancelBusyId={cancelBusyId}
+              onCancelOrder={async (orderId) => {
+                setCancelBusyId(orderId);
+                try {
+                  await cancelOrder(orderId);
+                } finally {
+                  setCancelBusyId(null);
+                }
+              }}
+              onOrderPlaced={() => {
+                setOrderPreset(null);
+                refreshTradingData();
+              }}
             />
           )}
           {activePage === 'dashboard' && (

@@ -30,6 +30,9 @@ class IbkrAdapter {
     this.onStatusChange = null;
     this.onOrderUpdate = null;
     this.settings = {};
+    this._pendingOpenOrders = null;
+    this._pendingPositions = null;
+    this._pendingAccountSummary = null;
   }
 
   setCallbacks({ onQuote, onStatusChange, onOrderUpdate }) {
@@ -162,8 +165,13 @@ class IbkrAdapter {
       });
 
       ib.on(EventName.openOrderEnd, () => {
+        const orders = [...this.openOrders];
+        if (this._pendingOpenOrders) {
+          this._pendingOpenOrders(orders);
+          this._pendingOpenOrders = null;
+        }
         if (this.onOrderUpdate) {
-          this.onOrderUpdate({ type: 'openOrderEnd', orders: [...this.openOrders] });
+          this.onOrderUpdate({ type: 'openOrderEnd', orders });
         }
       });
 
@@ -185,8 +193,13 @@ class IbkrAdapter {
       });
 
       ib.on(EventName.positionEnd, () => {
+        const positions = [...this.positions];
+        if (this._pendingPositions) {
+          this._pendingPositions(positions);
+          this._pendingPositions = null;
+        }
         if (this.onOrderUpdate) {
-          this.onOrderUpdate({ type: 'positionEnd', positions: [...this.positions] });
+          this.onOrderUpdate({ type: 'positionEnd', positions });
         }
       });
 
@@ -195,8 +208,13 @@ class IbkrAdapter {
       });
 
       ib.on(EventName.accountSummaryEnd, () => {
+        const summary = [...this.accountSummary];
+        if (this._pendingAccountSummary) {
+          this._pendingAccountSummary(summary);
+          this._pendingAccountSummary = null;
+        }
         if (this.onOrderUpdate) {
-          this.onOrderUpdate({ type: 'accountSummaryEnd', summary: [...this.accountSummary] });
+          this.onOrderUpdate({ type: 'accountSummaryEnd', summary });
         }
       });
 
@@ -318,50 +336,76 @@ class IbkrAdapter {
     return { cancelled: orderId };
   }
 
-  getOpenOrders() {
+  _awaitIbSnapshot({ reset, request, onEndSetter, timeoutMs = 8000 }) {
     if (!this.ib || this.status !== 'connected') {
-      return [];
+      return Promise.resolve([]);
     }
-    this.openOrders = [];
-    this.ib.reqAllOpenOrders();
-    return [...this.openOrders];
+    return new Promise((resolve) => {
+      reset();
+      const timer = setTimeout(() => {
+        onEndSetter(null);
+        resolve([]);
+      }, timeoutMs);
+      onEndSetter((rows) => {
+        clearTimeout(timer);
+        onEndSetter(null);
+        resolve(rows);
+      });
+      request();
+    });
+  }
+
+  getOpenOrders() {
+    return this._awaitIbSnapshot({
+      reset: () => {
+        this.openOrders = [];
+      },
+      request: () => this.ib.reqAllOpenOrders(),
+      onEndSetter: (fn) => {
+        this._pendingOpenOrders = fn;
+      },
+    });
   }
 
   refreshOpenOrders() {
-    if (!this.ib || this.status !== 'connected') return;
-    this.openOrders = [];
-    this.ib.reqAllOpenOrders();
+    return this.getOpenOrders();
   }
 
   getPositions() {
-    if (!this.ib || this.status !== 'connected') {
-      return [];
-    }
-    this.positions = [];
-    this.ib.reqPositions();
-    return [...this.positions];
+    return this._awaitIbSnapshot({
+      reset: () => {
+        this.positions = [];
+      },
+      request: () => this.ib.reqPositions(),
+      onEndSetter: (fn) => {
+        this._pendingPositions = fn;
+      },
+    });
   }
 
   refreshPositions() {
-    if (!this.ib || this.status !== 'connected') return;
-    this.positions = [];
-    this.ib.reqPositions();
+    return this.getPositions();
   }
 
   getAccountSummary() {
-    if (!this.ib || this.status !== 'connected') {
-      return [];
-    }
-    this.accountSummary = [];
-    const reqId = 9001;
-    this.ib.reqAccountSummary(reqId, 'All', 'NetLiquidation,TotalCashValue,BuyingPower,GrossPositionValue');
-    return [...this.accountSummary];
+    return this._awaitIbSnapshot({
+      reset: () => {
+        this.accountSummary = [];
+      },
+      request: () =>
+        this.ib.reqAccountSummary(
+          9001,
+          'All',
+          'NetLiquidation,TotalCashValue,BuyingPower,GrossPositionValue',
+        ),
+      onEndSetter: (fn) => {
+        this._pendingAccountSummary = fn;
+      },
+    });
   }
 
   refreshAccountSummary() {
-    if (!this.ib || this.status !== 'connected') return;
-    this.accountSummary = [];
-    this.ib.reqAccountSummary(9001, 'All', 'NetLiquidation,TotalCashValue,BuyingPower,GrossPositionValue');
+    return this.getAccountSummary();
   }
 }
 

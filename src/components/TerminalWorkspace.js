@@ -1,5 +1,6 @@
 import React from 'react';
 import OrderTicket from './OrderTicket';
+import OpenOrdersPanel from './OpenOrdersPanel';
 
 export default function TerminalWorkspace({
   symbol,
@@ -9,9 +10,15 @@ export default function TerminalWorkspace({
   connection,
   settings,
   orderPreset,
+  openOrders,
+  onRefreshOrders,
+  onCancelOrder,
+  ordersRefreshing,
+  cancelBusyId,
   onOrderPlaced,
 }) {
   return (
+    <div>
     <div style={{ display: 'flex', gap: 16, minHeight: 420 }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div
@@ -69,6 +76,15 @@ export default function TerminalWorkspace({
         preset={orderPreset}
         onPlaced={onOrderPlaced}
       />
+    </div>
+    <OpenOrdersPanel
+      connection={connection}
+      openOrders={openOrders}
+      onRefresh={onRefreshOrders}
+      onCancel={onCancelOrder}
+      refreshing={ordersRefreshing}
+      busyOrderId={cancelBusyId}
+    />
     </div>
   );
 }

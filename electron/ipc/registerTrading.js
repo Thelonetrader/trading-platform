@@ -46,20 +46,11 @@ function registerTradingIpc() {
 
   ipcMain.handle('trading:cancelOrder', async (_e, orderId) => broker.cancelOrder(orderId));
 
-  ipcMain.handle('trading:getOpenOrders', async () => {
-    broker.refreshOpenOrders();
-    return broker.getOpenOrders();
-  });
+  ipcMain.handle('trading:getOpenOrders', async () => broker.getOpenOrders());
 
-  ipcMain.handle('trading:getPositions', async () => {
-    broker.refreshPositions();
-    return broker.getPositions();
-  });
+  ipcMain.handle('trading:getPositions', async () => broker.getPositions());
 
-  ipcMain.handle('trading:getAccountSummary', async () => {
-    broker.refreshAccountSummary();
-    return broker.getAccountSummary();
-  });
+  ipcMain.handle('trading:getAccountSummary', async () => broker.getAccountSummary());
 }
 
 module.exports = { registerTradingIpc, broker };
