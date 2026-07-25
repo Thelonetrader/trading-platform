@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
 
-function Journal() {
+function Journal({ onOpenTerminal }) {
   const loadTrades = () => {
     const saved = localStorage.getItem('trades');
     return saved ? JSON.parse(saved) : [];
@@ -315,7 +315,27 @@ const handleDelete = (id) => {
                   background: i % 2 === 0 ? 'transparent' : '#060b1640',
                 }}>
                   <td style={{ padding: '12px 16px', fontSize: 13, color: '#64748b' }}>{trade.date}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}>{trade.ticker}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 700, color: '#f1f5f9' }}>
+                    {onOpenTerminal ? (
+                      <button
+                        type="button"
+                        onClick={() => onOpenTerminal(trade.ticker)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          padding: 0,
+                          color: '#818cf8',
+                          fontWeight: 700,
+                          fontSize: 13,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {trade.ticker}
+                      </button>
+                    ) : (
+                      trade.ticker
+                    )}
+                  </td>
                   <td style={{ padding: '12px 16px' }}>
                     <span style={{
                       fontSize: 11,
@@ -335,8 +355,27 @@ const handleDelete = (id) => {
                   </td>
                   <td style={{ padding: '12px 16px', fontSize: 12, color: '#475569', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {trade.reasoning || '—'}
-                    <td style={{ padding: '12px 16px' }}>
-                    <div style={{ display: 'flex', gap: 8 }}>
+                  </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {onOpenTerminal && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenTerminal(trade.ticker)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 5,
+                            border: 'none',
+                            background: '#6366f1',
+                            color: '#fff',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                          }}
+                        >
+                          Terminal
+                        </button>
+                      )}
                       <button onClick={() => handleEdit(trade)} style={{
                         padding: '4px 10px', borderRadius: 5, border: '1px solid #1a2035',
                         background: 'transparent', color: '#6366f1', fontSize: 11,
@@ -348,7 +387,6 @@ const handleDelete = (id) => {
                         cursor: 'pointer', fontWeight: 600,
                       }}>Delete</button>
                     </div>
-                  </td>
                   </td>
                 </tr>
               ))}

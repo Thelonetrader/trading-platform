@@ -19,11 +19,11 @@ Last updated: 2026-07-25 (app v0.2.x)
 | AI earnings summaries | **Not started** | — | LLM pipeline over earnings text + citations |
 | News sentiment analysis | **Not started** | Nav stub **News & Sentiment** | Feed ingest, symbol tagging, sentiment scores |
 | Backtesting strategies | **Partial** | Journal trade type **Backtest** (label only) | Rules engine, historical sim, equity curve |
-| Stock ranking (your criteria) | **Partial** | **Scorecards** + **Screener** (priority, rating, journal, presets) | Custom weighted rank formula, saved rank models |
-| Portfolio tracking | **Partial** | Manual portfolio P/L; IB **positions** tab | Unified view, cost basis sync, attribution |
-| Watchlists | **Done** | Notes, priority, sector, exchange/currency, quotes when IB connected | Tags (planned) |
-| Alerts (your rules) | **Not started** | Nav stub **Alerts** | Rule builder, eval on schedule/quote, notifications |
-| Journal | **Done** | CRUD, P/L stats, export via Settings backup | Link journal row → terminal symbol (enhancement) |
+| Stock ranking (your criteria) | **Partial** | **Scorecards** + **Screener** + **custom rank** + presets | Saved rank models beyond weights |
+| Portfolio tracking | **Partial** | Manual portfolio P/L; IB positions tab; **All holdings** unified view | Full cost-basis sync, attribution |
+| Watchlists | **Done** | Notes, priority, sector, exchange/currency, **tags**, quotes when IB connected | — |
+| Alerts (your rules) | **Partial** | **Alerts** rules + rank weights; **desktop/sound notify** while app open | Price-triggered rules, push when app closed |
+| Journal | **Done** | CRUD, P/L stats, export via Settings backup, **open Terminal from row** | — |
 | Detailed volume scanner | **Not started** | — | Unusual volume, RVOL, scan universe |
 
 ### Also shipped (supporting your workflow)
@@ -59,7 +59,14 @@ Suggested providers (pick one stack; not implemented yet):
 3. **Screener**: sort/filter by custom rank.  
 4. Watchlist **tags** for rule conditions.
 
-Export/import includes `alertRules` and `rankWeights`.
+Export/import includes `alertRules`, `rankWeights`, and `alertNotifyPrefs`.
+
+### Local polish (no paid API) ✅
+
+- **Alert notifications** while app is open (desktop + optional sound)  
+- **Portfolio · All holdings** (manual + IB)  
+- **Journal → Terminal** from ticker or row action  
+- Journal table markup fix  
 
 ### Phase 2 — Market data foundation
 
@@ -93,7 +100,7 @@ Export/import includes `alertRules` and `rankWeights`.
 
 | Nav item | Target phase |
 |----------|----------------|
-| Alerts | Phase 1 |
+| Alerts | Phase 1 ✅ (local notify polish) |
 | News & Sentiment | Phase 3 |
 | Stock Screener | Extend Phase 1–2 (API filters) |
 | Chart (Terminal) | Phase 2 |

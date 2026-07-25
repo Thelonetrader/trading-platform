@@ -12,6 +12,7 @@ import TerminalWorkspace from './components/TerminalWorkspace';
 import AccountStrip from './components/AccountStrip';
 import Settings from './components/Settings';
 import { useTradingApi } from './hooks/useTradingApi';
+import { useAlertNotifications } from './hooks/useAlertNotifications';
 import { parseCommand } from './utils/parseCommand';
 import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
 import {
@@ -48,6 +49,24 @@ function App() {
     refreshTradingData,
     cancelOrder,
   } = useTradingApi();
+
+  useAlertNotifications();
+
+  const openTerminalForTicker = useCallback((sym) => {
+    const upper = (sym || '').trim().toUpperCase();
+    if (!upper) return;
+    const w = readJson('watchlist', []).find(
+      (x) => (x.ticker || '').trim().toUpperCase() === upper,
+    );
+    setActiveSymbol(upper);
+    if (w) {
+      setActiveContract({
+        exchange: w.exchange || 'SMART',
+        currency: w.currency || 'USD',
+      });
+    }
+    setActivePage('terminal');
+  }, []);
 
   const watchlistSymbols = getWatchlistSymbols();
   const stripSymbols = watchlistSymbols.length
@@ -231,7 +250,7 @@ function App() {
         </nav>
 
         <div style={{ padding: '16px 20px', borderTop: '1px solid #1a2035', fontSize: 11, color: '#1e293b' }}>
-          v0.2.0 · ⌘K command
+          v0.2.1 · ⌘K command
         </div>
       </div>
 
@@ -339,7 +358,7 @@ function App() {
           {activePage === 'dashboard' && (
             <Dashboard onNavigate={setActivePage} portfolioStats={getPortfolioStats()} />
           )}
-          {activePage === 'journal' && <Journal />}
+          {activePage === 'journal' && <Journal onOpenTerminal={openTerminalForTicker} />}
           {activePage === 'watchlist' && (
             <Watchlist
               quotes={quotes}
@@ -350,7 +369,14 @@ function App() {
               }}
             />
           )}
-          {activePage === 'portfolio' && <Portfolio connection={connection} />}
+          {activePage === 'portfolio' && (
+            <Portfolio
+              connection={connection}
+              quotes={quotes}
+              onOpenTerminal={openTerminalForTicker}
+              subscribeSymbols={subscribeSymbols}
+            />
+          )}
           {activePage === 'scorecard' && (
             <Scorecards
               focusTicker={scorecardFocus.ticker}

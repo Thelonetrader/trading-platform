@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
 
-function Portfolio({ connection }) {
+function Portfolio({ connection, quotes = {}, onOpenTerminal, subscribeSymbols }) {
   const loadHoldings = () => {
     const saved = localStorage.getItem('portfolio');
     return saved ? JSON.parse(saved) : [];
   };
-  const [tab, setTab] = useState('manual');
+  const [tab, setTab] = useState('combined');
   const [brokerPositions, setBrokerPositions] = useState([]);
   const [loadingBroker, setLoadingBroker] = useState(false);
   const [holdings, setHoldings] = useState(loadHoldings);
@@ -53,7 +53,7 @@ function Portfolio({ connection }) {
   const totalIncome = holdings.reduce((sum, h) => sum + parseFloat(calcAnnualIncome(h)), 0).toFixed(2);
 
   useEffect(() => {
-    if (tab !== 'broker' || connection?.status !== 'connected' || !window.trading) return;
+    if ((tab !== 'broker' && tab !== 'combined') || connection?.status !== 'connected' || !window.trading) return;
     setLoadingBroker(true);
     window.trading
       .getPositions()
@@ -61,6 +61,75 @@ function Portfolio({ connection }) {
       .catch(() => setBrokerPositions([]))
       .finally(() => setLoadingBroker(false));
   }, [tab, connection?.status]);
+
+  const quoteSymbols = useMemo(() => {
+    const s = new Set();
+    holdings.forEach((h) => {
+      if (h.ticker) s.add(h.ticker.toUpperCase());
+    });
+    brokerPositions.forEach((p) => {
+      if (p.symbol) s.add(p.symbol.toUpperCase());
+    });
+    return [...s];
+  }, [holdings, brokerPositions]);
+
+  useEffect(() => {
+    if (connection?.status === 'connected' && quoteSymbols.length && subscribeSymbols) {
+      subscribeSymbols(quoteSymbols);
+    }
+  }, [connection?.status, quoteSymbols, subscribeSymbols]);
+
+  const unifiedRows = useMemo(() => {
+    const rows = [];
+    holdings.forEach((h) => {
+      const ticker = (h.ticker || '').toUpperCase();
+      const shares = parseFloat(h.shares) || 0;
+      const avg = parseFloat(h.avgBuyPrice) || 0;
+      const price = parseFloat(h.currentPrice || h.avgBuyPrice) || avg;
+      const value = shares * price;
+      const cost = shares * avg;
+      rows.push({
+        key: `manual-${h.id}`,
+        source: 'Manual',
+        ticker,
+        name: h.name,
+        shares,
+        avgCost: avg,
+        price,
+        value,
+        pl: value - cost,
+        currency: 'GBP',
+      });
+    });
+    brokerPositions.forEach((p, i) => {
+      const ticker = (p.symbol || '').toUpperCase();
+      const shares = Number(p.position) || 0;
+      const avg = Number(p.avgCost) || 0;
+      const live = quotes[ticker]?.last;
+      const price = live != null ? Number(live) : avg;
+      const value = shares * price;
+      const cost = shares * avg;
+      rows.push({
+        key: `ib-${ticker}-${i}`,
+        source: 'IB',
+        ticker,
+        name: p.exchange,
+        shares,
+        avgCost: avg,
+        price,
+        value,
+        pl: value - cost,
+        currency: p.currency || 'USD',
+      });
+    });
+    return rows.sort((a, b) => a.ticker.localeCompare(b.ticker) || a.source.localeCompare(b.source));
+  }, [holdings, brokerPositions, quotes]);
+
+  const combinedTotals = useMemo(() => {
+    const value = unifiedRows.reduce((s, r) => s + r.value, 0);
+    const cost = unifiedRows.reduce((s, r) => s + r.shares * r.avgCost, 0);
+    return { value, cost, pl: value - cost, count: unifiedRows.length };
+  }, [unifiedRows]);
 
   useEffect(() => {
     const reload = () => setHoldings(loadHoldings());
@@ -136,14 +205,133 @@ function Portfolio({ connection }) {
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        {tabBtn('manual', 'Manual holdings')}
-        {tabBtn('broker', 'IB positions')}
+        {tabBtn('combined', 'All holdings')}
+        {tabBtn('manual', 'Manual only')}
+        {tabBtn('broker', 'IB only')}
       </div>
+
+      {tab === 'combined' && (
+        <div style={{ marginBottom: 24 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: 12,
+              marginBottom: 16,
+            }}
+          >
+            {[
+              { label: 'Lines', value: String(combinedTotals.count) },
+              { label: 'Est. value', value: `£${combinedTotals.value.toFixed(2)}` },
+              {
+                label: 'Est. P&L',
+                value: `£${combinedTotals.pl.toFixed(2)}`,
+                color: combinedTotals.pl >= 0 ? '#22c55e' : '#ef4444',
+              },
+            ].map((s) => (
+              <div
+                key={s.label}
+                style={{
+                  background: '#0a0f1e',
+                  border: '1px solid #1a2035',
+                  borderRadius: 10,
+                  padding: '14px 16px',
+                }}
+              >
+                <div style={{ fontSize: 11, color: '#475569', textTransform: 'uppercase', marginBottom: 4 }}>{s.label}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: s.color || '#f1f5f9' }}>{s.value}</div>
+              </div>
+            ))}
+          </div>
+          {connection?.status !== 'connected' && (
+            <div style={{ color: '#64748b', fontSize: 12, marginBottom: 12 }}>
+              Connect IB to include live broker positions and quotes on this view.
+            </div>
+          )}
+          {loadingBroker && connection?.status === 'connected' && (
+            <div style={{ color: '#64748b', fontSize: 13, marginBottom: 12 }}>Refreshing IB positions…</div>
+          )}
+          {unifiedRows.length === 0 ? (
+            <div style={{ color: '#64748b', fontSize: 13 }}>Add manual holdings or connect IB with open positions.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {unifiedRows.map((row) => (
+                <div
+                  key={row.key}
+                  style={{
+                    background: '#0a0f1e',
+                    border: '1px solid #1a2035',
+                    borderRadius: 10,
+                    padding: '14px 18px',
+                    display: 'grid',
+                    gridTemplateColumns: '72px 1fr repeat(4, auto) auto',
+                    gap: 12,
+                    alignItems: 'center',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: row.source === 'IB' ? '#22c55e' : '#818cf8',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {row.source}
+                  </span>
+                  <div>
+                    <span style={{ fontWeight: 800, color: '#f1f5f9' }}>{row.ticker}</span>
+                    {row.name && <span style={{ marginLeft: 8, fontSize: 12, color: '#64748b' }}>{row.name}</span>}
+                  </div>
+                  <div style={{ fontSize: 13, color: '#94a3b8' }}>{row.shares} sh</div>
+                  <div style={{ fontSize: 13, color: '#64748b' }}>
+                    {row.avgCost.toFixed(2)} {row.currency}
+                  </div>
+                  <div style={{ fontSize: 13, color: '#e2e8f0' }}>
+                    {row.price.toFixed(2)}
+                    {quotes[row.ticker]?.last != null && row.source === 'IB' && (
+                      <span style={{ marginLeft: 4, fontSize: 10, color: '#22c55e' }}>live</span>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: row.pl >= 0 ? '#22c55e' : '#ef4444',
+                    }}
+                  >
+                    {row.pl >= 0 ? '+' : ''}
+                    {row.pl.toFixed(2)}
+                  </div>
+                  {onOpenTerminal && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenTerminal(row.ticker)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        border: 'none',
+                        background: '#6366f1',
+                        color: '#fff',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Terminal
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {tab === 'broker' && (
         <div style={{ marginBottom: 24 }}>
           {connection?.status !== 'connected' ? (
-            <div style={{ color: '#f59e0b', fontSize: 13 }}>Connect IB Gateway in Settings to view broker positions.</div>
+            <div style={{ color: '#f59e0b', fontSize: 13 }}>Connect IB in Settings to view broker positions.</div>
           ) : loadingBroker ? (
             <div style={{ color: '#64748b', fontSize: 13 }}>Loading positions…</div>
           ) : brokerPositions.length === 0 ? (

@@ -1,5 +1,6 @@
 import { readJson } from './storageStats';
 import { RANK_WEIGHTS_KEY, getRankWeights } from './customRank';
+import { ALERT_NOTIFY_PREFS_KEY, getAlertNotifyPrefs } from './alertNotifications';
 
 export const BACKUP_VERSION = 1;
 export const BACKUP_APP_ID = 'trading-platform';
@@ -25,6 +26,7 @@ export function buildExportPayload({ includeBroker = false, brokerSettings = nul
     data[key] = readJson(key, emptyForKey(key));
   }
   data.rankWeights = getRankWeights();
+  data.alertNotifyPrefs = getAlertNotifyPrefs();
 
   const payload = {
     version: BACKUP_VERSION,
@@ -59,6 +61,10 @@ export function validateBackupPayload(raw) {
   const rw = raw.data.rankWeights;
   if (rw != null && (typeof rw !== 'object' || Array.isArray(rw))) {
     throw new Error('Backup field "rankWeights" must be an object');
+  }
+  const np = raw.data.alertNotifyPrefs;
+  if (np != null && (typeof np !== 'object' || Array.isArray(np))) {
+    throw new Error('Backup field "alertNotifyPrefs" must be an object');
   }
   return raw;
 }
@@ -105,6 +111,12 @@ export function applyResearchImport(payload, mode = 'merge') {
     }
   }
 
+  const incomingNotify = validated.data.alertNotifyPrefs;
+  if (incomingNotify != null) {
+    const merged = mode === 'replace' ? incomingNotify : { ...getAlertNotifyPrefs(), ...incomingNotify };
+    localStorage.setItem(ALERT_NOTIFY_PREFS_KEY, JSON.stringify(merged));
+  }
+
   return {
     broker: validated.broker?.ib ?? null,
   };
@@ -146,6 +158,7 @@ export function summarizeBackup(payload) {
     counts[key] = (validated.data[key] || []).length;
   }
   counts.rankWeights = validated.data.rankWeights ? 1 : 0;
+  counts.alertNotifyPrefs = validated.data.alertNotifyPrefs ? 1 : 0;
   return {
     exportedAt: validated.exportedAt,
     counts,

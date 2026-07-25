@@ -13,10 +13,18 @@ import {
   rankAllWatchlistItems,
   saveRankWeights,
 } from './utils/customRank';
+import {
+  DEFAULT_ALERT_NOTIFY_PREFS,
+  ensureNotificationPermission,
+  getAlertNotifyPrefs,
+  saveAlertNotifyPrefs,
+  saveAlertNotifyState,
+} from './utils/alertNotifications';
 
 export default function Alerts({ onOpenTerminal, onOpenScreener }) {
   const [weights, setWeights] = useState(() => getRankWeights());
   const [rules, setRules] = useState(() => listAlertRules());
+  const [notifyPrefs, setNotifyPrefs] = useState(() => getAlertNotifyPrefs());
   const [form, setForm] = useState({ ...DEFAULT_RULE_TEMPLATE });
   const [editingId, setEditingId] = useState(null);
   const [msg, setMsg] = useState('');
@@ -100,6 +108,23 @@ export default function Alerts({ onOpenTerminal, onOpenScreener }) {
 
   const totalMatches = evaluations.reduce((n, e) => n + e.matches.length, 0);
 
+  const saveNotifyPrefs = async (next) => {
+    if (next.enabled && next.desktopNotify) {
+      const ok = await ensureNotificationPermission();
+      if (!ok) {
+        setMsg('Enable notifications in macOS System Settings for this app');
+        setTimeout(() => setMsg(''), 4000);
+        return;
+      }
+    }
+    setNotifyPrefs(next);
+    saveAlertNotifyPrefs(next);
+    saveAlertNotifyState({ lastFingerprint: '' });
+    window.dispatchEvent(new Event('alert-notify-prefs-changed'));
+    setMsg('Notification settings saved');
+    setTimeout(() => setMsg(''), 2500);
+  };
+
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
@@ -112,6 +137,61 @@ export default function Alerts({ onOpenTerminal, onOpenScreener }) {
           criteria (no market data API required).
         </div>
         {msg && <div style={{ marginTop: 8, fontSize: 13, color: '#22c55e' }}>{msg}</div>}
+      </div>
+
+      <div
+        style={{
+          background: '#0a0f1e',
+          border: '1px solid #1a2035',
+          borderRadius: 12,
+          padding: 20,
+          marginBottom: 20,
+        }}
+      >
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#f1f5f9', marginBottom: 8 }}>Background notifications</div>
+        <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 14px', maxWidth: 520 }}>
+          Periodically re-check rules while the app is open. You are notified when the match set changes (not on every poll).
+        </p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#94a3b8', marginBottom: 12 }}>
+          <input
+            type="checkbox"
+            checked={notifyPrefs.enabled}
+            onChange={(e) => saveNotifyPrefs({ ...notifyPrefs, enabled: e.target.checked })}
+          />
+          Enable alert notifications
+        </label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 12 }}>
+          <div>
+            <label style={labelStyle}>Check every (minutes)</label>
+            <input
+              type="number"
+              min={1}
+              max={240}
+              style={inputStyle}
+              value={notifyPrefs.intervalMinutes}
+              onChange={(e) =>
+                setNotifyPrefs((p) => ({ ...p, intervalMinutes: Number(e.target.value) || DEFAULT_ALERT_NOTIFY_PREFS.intervalMinutes }))
+              }
+              onBlur={() => saveNotifyPrefs(notifyPrefs)}
+            />
+          </div>
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#94a3b8', marginRight: 16 }}>
+          <input
+            type="checkbox"
+            checked={notifyPrefs.desktopNotify}
+            onChange={(e) => saveNotifyPrefs({ ...notifyPrefs, desktopNotify: e.target.checked })}
+          />
+          Desktop notification
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#94a3b8', marginTop: 8 }}>
+          <input
+            type="checkbox"
+            checked={notifyPrefs.sound}
+            onChange={(e) => saveNotifyPrefs({ ...notifyPrefs, sound: e.target.checked })}
+          />
+          Short sound
+        </label>
       </div>
 
       <div
