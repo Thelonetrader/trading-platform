@@ -93,3 +93,7 @@ Research data lives in the app’s **localStorage** (not in git). Use **Settings
 `npm start` runs the UI in the browser; broker APIs are available only in Electron (`window.trading`).
 
 See `.env.example` for optional environment defaults.
+
+## Product roadmap
+
+Full feature inventory (historical data, fundamentals, alerts, backtesting, etc.) and build phases: [docs/ROADMAP.md](docs/ROADMAP.md).
