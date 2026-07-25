@@ -25,6 +25,7 @@ function App() {
   const [commandMsg, setCommandMsg] = useState('');
   const [orderPreset, setOrderPreset] = useState(null);
   const [scorecardFocus, setScorecardFocus] = useState({ ticker: '', sector: '' });
+  const [screenerRefreshKey, setScreenerRefreshKey] = useState(0);
 
   const {
     connection,
@@ -42,6 +43,12 @@ function App() {
     : activeSymbol
       ? [{ ticker: activeSymbol, ...activeContract }]
       : [];
+
+  useEffect(() => {
+    if (activePage === 'screener') {
+      setScreenerRefreshKey((k) => k + 1);
+    }
+  }, [activePage]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -303,6 +310,7 @@ function App() {
           )}
           {activePage === 'screener' && (
             <Screener
+              refreshKey={screenerRefreshKey}
               quotes={quotes}
               connection={connection}
               onOpenTerminal={(sym, contract) => {

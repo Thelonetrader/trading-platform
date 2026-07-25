@@ -1,5 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { readJson } from './utils/storageStats';
+import { getJournalIndexByTicker } from './utils/journalIndex';
+import {
+  DEFAULT_SCREENER_FILTERS,
+  deleteScreenerPreset,
+  listScreenerPresets,
+  saveScreenerPreset,
+} from './utils/screenerPresets';
 import { SECTORS, getRatingColor } from './scorecards/model';
 import { getBestEvalForTicker, listScorecardEvals } from './scorecards/storage';
 
@@ -9,6 +16,12 @@ const RATING_FILTERS = [
   { id: 'hold+', label: 'Hold+ (≥2.5)', minAvg: 2.5 },
   { id: 'buy+', label: 'Buy+ (≥3.5)', minAvg: 3.5 },
   { id: 'sb', label: 'Strong Buy (≥4.5)', minAvg: 4.5 },
+];
+
+const JOURNAL_FILTERS = [
+  { id: 'any', label: 'Any journal status' },
+  { id: 'has', label: 'Has journal entry' },
+  { id: 'none', label: 'No journal yet' },
 ];
 
 const SORT_OPTIONS = [
@@ -29,10 +42,11 @@ function sectorFromWatchlistLabel(sectorText) {
   return '';
 }
 
-function buildRows(watchlist) {
+function buildRows(watchlist, journalIndex) {
   return watchlist.map((item) => {
     const ticker = (item.ticker || '').toUpperCase();
     const evalRow = getBestEvalForTicker(ticker);
+    const journal = journalIndex.get(ticker);
     return {
       id: item.id,
       ticker,
@@ -46,75 +60,173 @@ function buildRows(watchlist) {
       exchange: item.exchange || 'SMART',
       currency: item.currency || 'USD',
       eval: evalRow,
+      journal,
     };
   });
 }
 
-export default function Screener({ quotes = {}, connection, onOpenTerminal, onOpenScorecard }) {
-  const [priorityFilter, setPriorityFilter] = useState({ High: true, Medium: true, Low: true });
-  const [sectorQuery, setSectorQuery] = useState('');
-  const [ratingFilter, setRatingFilter] = useState('hold+');
-  const [requireScorecard, setRequireScorecard] = useState(false);
-  const [minChange, setMinChange] = useState('');
-  const [maxChange, setMaxChange] = useState('');
-  const [sortBy, setSortBy] = useState('priority');
-  const [search, setSearch] = useState('');
+function filterAndSortRows(rows, filters, quotes) {
+  const q = filters.search.trim().toUpperCase();
+  const sectorQ = filters.sectorQuery.trim().toLowerCase();
+  const minCh = filters.minChange === '' ? null : parseFloat(filters.minChange);
+  const maxCh = filters.maxChange === '' ? null : parseFloat(filters.maxChange);
+  const minAvg = RATING_FILTERS.find((r) => r.id === filters.ratingFilter)?.minAvg ?? 0;
 
-  const evalCount = listScorecardEvals().length;
+  let filtered = rows.filter((row) => {
+    if (!filters.priorityFilter[row.priority]) return false;
+    if (q && !row.ticker.includes(q) && !row.name.toUpperCase().includes(q)) return false;
+    if (sectorQ && !row.sectorLabel.toLowerCase().includes(sectorQ)) return false;
+    if (filters.requireScorecard && !row.eval) return false;
+    if (row.eval && row.eval.avg < minAvg) return false;
+    if (!row.eval && minAvg > 0) return false;
+    if (filters.journalFilter === 'has' && !row.journal) return false;
+    if (filters.journalFilter === 'none' && row.journal) return false;
 
-  const rows = useMemo(() => {
-    const built = buildRows(readJson('watchlist', []));
-    const q = search.trim().toUpperCase();
-    const sectorQ = sectorQuery.trim().toLowerCase();
-    const minCh = minChange === '' ? null : parseFloat(minChange);
-    const maxCh = maxChange === '' ? null : parseFloat(maxChange);
-    const minAvg = RATING_FILTERS.find((r) => r.id === ratingFilter)?.minAvg ?? 0;
+    const quote = quotes[row.ticker];
+    const ch = quote?.changePct;
+    if (minCh != null && (ch == null || ch < minCh)) return false;
+    if (maxCh != null && (ch == null || ch > maxCh)) return false;
+    return true;
+  });
 
-    let filtered = built.filter((row) => {
-      if (!priorityFilter[row.priority]) return false;
-      if (q && !row.ticker.includes(q) && !row.name.toUpperCase().includes(q)) return false;
-      if (sectorQ && !row.sectorLabel.toLowerCase().includes(sectorQ)) return false;
-      if (requireScorecard && !row.eval) return false;
-      if (row.eval && row.eval.avg < minAvg) return false;
-      if (!row.eval && minAvg > 0) return false;
+  filtered = [...filtered].sort((a, b) => {
+    if (filters.sortBy === 'ticker') return a.ticker.localeCompare(b.ticker);
+    if (filters.sortBy === 'added') return (b.addedDate || '').localeCompare(a.addedDate || '');
+    if (filters.sortBy === 'score') {
+      const sa = a.eval?.avg ?? -1;
+      const sb = b.eval?.avg ?? -1;
+      return sb - sa;
+    }
+    if (filters.sortBy === 'change') {
+      const ca = quotes[a.ticker]?.changePct ?? -Infinity;
+      const cb = quotes[b.ticker]?.changePct ?? -Infinity;
+      return cb - ca;
+    }
+    const pr = priorityRank(a.priority) - priorityRank(b.priority);
+    if (pr !== 0) return pr;
+    return a.ticker.localeCompare(b.ticker);
+  });
 
-      const quote = quotes[row.ticker];
-      const ch = quote?.changePct;
-      if (minCh != null && (ch == null || ch < minCh)) return false;
-      if (maxCh != null && (ch == null || ch > maxCh)) return false;
-      return true;
-    });
+  return filtered;
+}
 
-    filtered = [...filtered].sort((a, b) => {
-      if (sortBy === 'ticker') return a.ticker.localeCompare(b.ticker);
-      if (sortBy === 'added') return (b.addedDate || '').localeCompare(a.addedDate || '');
-      if (sortBy === 'score') {
-        const sa = a.eval?.avg ?? -1;
-        const sb = b.eval?.avg ?? -1;
-        return sb - sa;
-      }
-      if (sortBy === 'change') {
-        const ca = quotes[a.ticker]?.changePct ?? -Infinity;
-        const cb = quotes[b.ticker]?.changePct ?? -Infinity;
-        return cb - ca;
-      }
-      const pr = priorityRank(a.priority) - priorityRank(b.priority);
-      if (pr !== 0) return pr;
-      return a.ticker.localeCompare(b.ticker);
-    });
+export default function Screener({
+  quotes = {},
+  connection,
+  refreshKey = 0,
+  onOpenTerminal,
+  onOpenScorecard,
+}) {
+  const [priorityFilter, setPriorityFilter] = useState(DEFAULT_SCREENER_FILTERS.priorityFilter);
+  const [sectorQuery, setSectorQuery] = useState(DEFAULT_SCREENER_FILTERS.sectorQuery);
+  const [ratingFilter, setRatingFilter] = useState(DEFAULT_SCREENER_FILTERS.ratingFilter);
+  const [requireScorecard, setRequireScorecard] = useState(DEFAULT_SCREENER_FILTERS.requireScorecard);
+  const [journalFilter, setJournalFilter] = useState(DEFAULT_SCREENER_FILTERS.journalFilter);
+  const [minChange, setMinChange] = useState(DEFAULT_SCREENER_FILTERS.minChange);
+  const [maxChange, setMaxChange] = useState(DEFAULT_SCREENER_FILTERS.maxChange);
+  const [sortBy, setSortBy] = useState(DEFAULT_SCREENER_FILTERS.sortBy);
+  const [search, setSearch] = useState(DEFAULT_SCREENER_FILTERS.search);
 
-    return filtered;
-  }, [
+  const [presets, setPresets] = useState(() => listScreenerPresets());
+  const [selectedPresetId, setSelectedPresetId] = useState('');
+  const [presetName, setPresetName] = useState('');
+  const [presetMsg, setPresetMsg] = useState('');
+
+  const [watchlistSnapshot, setWatchlistSnapshot] = useState(() => readJson('watchlist', []));
+
+  useEffect(() => {
+    setWatchlistSnapshot(readJson('watchlist', []));
+    setPresets(listScreenerPresets());
+  }, [refreshKey]);
+
+  const filters = {
     priorityFilter,
     sectorQuery,
     ratingFilter,
     requireScorecard,
+    journalFilter,
+    minChange,
+    maxChange,
+    sortBy,
+    search,
+  };
+
+  const evalCount = listScorecardEvals().length;
+
+  const rows = useMemo(() => {
+    const journalIndex = getJournalIndexByTicker();
+    const built = buildRows(watchlistSnapshot, journalIndex);
+    return filterAndSortRows(
+      built,
+      {
+        priorityFilter,
+        sectorQuery,
+        ratingFilter,
+        requireScorecard,
+        journalFilter,
+        minChange,
+        maxChange,
+        sortBy,
+        search,
+      },
+      quotes,
+    );
+  }, [
+    watchlistSnapshot,
+    priorityFilter,
+    sectorQuery,
+    ratingFilter,
+    requireScorecard,
+    journalFilter,
     minChange,
     maxChange,
     sortBy,
     search,
     quotes,
   ]);
+
+  const applyFilters = (next) => {
+    setPriorityFilter(next.priorityFilter ?? DEFAULT_SCREENER_FILTERS.priorityFilter);
+    setSectorQuery(next.sectorQuery ?? '');
+    setRatingFilter(next.ratingFilter ?? 'any');
+    setRequireScorecard(!!next.requireScorecard);
+    setJournalFilter(next.journalFilter ?? 'any');
+    setMinChange(next.minChange ?? '');
+    setMaxChange(next.maxChange ?? '');
+    setSortBy(next.sortBy ?? 'priority');
+    setSearch(next.search ?? '');
+  };
+
+  const handleLoadPreset = () => {
+    const preset = presets.find((p) => String(p.id) === String(selectedPresetId));
+    if (!preset?.filters) return;
+    applyFilters(preset.filters);
+    setPresetMsg(`Loaded “${preset.name}”`);
+    setTimeout(() => setPresetMsg(''), 2500);
+  };
+
+  const handleSavePreset = () => {
+    const saved = saveScreenerPreset(presetName, filters);
+    if (!saved) {
+      setPresetMsg('Enter a preset name');
+      return;
+    }
+    const next = listScreenerPresets();
+    setPresets(next);
+    setSelectedPresetId(String(saved.id));
+    setPresetMsg(`Saved “${saved.name}”`);
+    setTimeout(() => setPresetMsg(''), 2500);
+  };
+
+  const handleDeletePreset = () => {
+    if (!selectedPresetId) return;
+    const preset = presets.find((p) => String(p.id) === String(selectedPresetId));
+    deleteScreenerPreset(Number(selectedPresetId));
+    setPresets(listScreenerPresets());
+    setSelectedPresetId('');
+    setPresetMsg(preset ? `Deleted “${preset.name}”` : 'Preset deleted');
+    setTimeout(() => setPresetMsg(''), 2500);
+  };
 
   const inputStyle = {
     background: '#060b16',
@@ -137,6 +249,11 @@ export default function Screener({ quotes = {}, connection, onOpenTerminal, onOp
     display: 'block',
   };
 
+  const rowSnippet = (row) => {
+    if (row.journal?.snippet) return row.journal.snippet;
+    return row.notes || '—';
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
@@ -148,15 +265,106 @@ export default function Screener({ quotes = {}, connection, onOpenTerminal, onOp
             Stock Screener
           </div>
           <div style={{ fontSize: 13, color: '#64748b', marginTop: 6, maxWidth: 520 }}>
-            Filter your watchlist by priority, saved scorecard ratings, and live day change when IB is connected.
+            Filter your watchlist by priority, scorecard ratings, journal coverage, and live day change when IB is connected.
           </div>
         </div>
         <div style={{ fontSize: 12, color: '#475569', textAlign: 'right' }}>
-          <div>{readJson('watchlist', []).length} watchlist · {evalCount} saved evals</div>
+          <div>{watchlistSnapshot.length} watchlist · {evalCount} saved evals</div>
           <div style={{ marginTop: 4, color: connection?.status === 'connected' ? '#22c55e' : '#64748b' }}>
             {connection?.status === 'connected' ? 'Live quotes on' : 'Connect IB for % change filters'}
           </div>
         </div>
+      </div>
+
+      <div
+        style={{
+          background: '#0a0f1e',
+          border: '1px solid #1a2035',
+          borderRadius: 12,
+          padding: 16,
+          marginBottom: 16,
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 10,
+          alignItems: 'flex-end',
+        }}
+      >
+        <div style={{ flex: '1 1 160px', minWidth: 140 }}>
+          <label style={labelStyle}>Saved screen</label>
+          <select
+            style={inputStyle}
+            value={selectedPresetId}
+            onChange={(e) => setSelectedPresetId(e.target.value)}
+          >
+            <option value="">— Select preset —</option>
+            {presets.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="button"
+          onClick={handleLoadPreset}
+          disabled={!selectedPresetId}
+          style={{
+            padding: '8px 14px',
+            borderRadius: 8,
+            border: 'none',
+            background: selectedPresetId ? '#6366f1' : '#1a2035',
+            color: selectedPresetId ? '#fff' : '#475569',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: selectedPresetId ? 'pointer' : 'default',
+          }}
+        >
+          Load
+        </button>
+        <div style={{ flex: '1 1 140px', minWidth: 120 }}>
+          <label style={labelStyle}>Save as</label>
+          <input
+            style={inputStyle}
+            placeholder="Preset name"
+            value={presetName}
+            onChange={(e) => setPresetName(e.target.value)}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={handleSavePreset}
+          style={{
+            padding: '8px 14px',
+            borderRadius: 8,
+            border: '1px solid #6366f1',
+            background: '#6366f115',
+            color: '#818cf8',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          onClick={handleDeletePreset}
+          disabled={!selectedPresetId}
+          style={{
+            padding: '8px 14px',
+            borderRadius: 8,
+            border: '1px solid #1a2035',
+            background: 'transparent',
+            color: selectedPresetId ? '#ef4444' : '#334155',
+            fontSize: 13,
+            cursor: selectedPresetId ? 'pointer' : 'default',
+          }}
+        >
+          Delete
+        </button>
+        {presetMsg && (
+          <span style={{ fontSize: 12, color: '#22c55e', alignSelf: 'center' }}>{presetMsg}</span>
+        )}
       </div>
 
       <div
@@ -197,6 +405,20 @@ export default function Screener({ quotes = {}, connection, onOpenTerminal, onOp
             onChange={(e) => setRatingFilter(e.target.value)}
           >
             {RATING_FILTERS.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Journal</label>
+          <select
+            style={inputStyle}
+            value={journalFilter}
+            onChange={(e) => setJournalFilter(e.target.value)}
+          >
+            {JOURNAL_FILTERS.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.label}
               </option>
@@ -261,7 +483,7 @@ export default function Screener({ quotes = {}, connection, onOpenTerminal, onOp
         {rows.length} match{rows.length === 1 ? '' : 'es'}
       </div>
 
-      {readJson('watchlist', []).length === 0 ? (
+      {watchlistSnapshot.length === 0 ? (
         <div
           style={{
             background: '#0a0f1e',
@@ -294,7 +516,7 @@ export default function Screener({ quotes = {}, connection, onOpenTerminal, onOp
                   borderRadius: 10,
                   padding: '14px 18px',
                   display: 'grid',
-                  gridTemplateColumns: 'minmax(120px, 1fr) minmax(100px, auto) minmax(80px, auto) minmax(100px, auto) 1fr auto',
+                  gridTemplateColumns: 'minmax(120px, 1fr) minmax(88px, auto) minmax(80px, auto) minmax(100px, auto) minmax(48px, auto) 1fr auto',
                   gap: 12,
                   alignItems: 'center',
                 }}
@@ -325,8 +547,21 @@ export default function Screener({ quotes = {}, connection, onOpenTerminal, onOp
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 11, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {row.notes || '—'}
+                <div style={{ fontSize: 11, color: row.journal ? '#818cf8' : '#334155' }} title="Journal entries for ticker">
+                  {row.journal ? `${row.journal.count}✦` : '—'}
+                </div>
+                <div
+                  style={{ fontSize: 11, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                  title={rowSnippet(row)}
+                >
+                  {row.journal?.snippet ? (
+                    <>
+                      <span style={{ color: '#64748b' }}>Journal: </span>
+                      {row.journal.snippet}
+                    </>
+                  ) : (
+                    rowSnippet(row)
+                  )}
                 </div>
                 <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                   <button
