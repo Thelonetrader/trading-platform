@@ -246,9 +246,16 @@ class IbkrAdapter {
   }
 
   _contractFromSymbol(entry) {
-    const symbol = typeof entry === 'string' ? entry : entry.symbol;
-    const exchange = (typeof entry === 'object' && entry.exchange) || 'SMART';
-    const currency = (typeof entry === 'object' && entry.currency) || 'USD';
+    const raw =
+      typeof entry === 'string'
+        ? entry
+        : entry?.symbol || entry?.ticker || '';
+    const symbol = String(raw).trim();
+    if (!symbol) {
+      throw new Error('Missing symbol for quote or order');
+    }
+    const exchange = (typeof entry === 'object' && entry?.exchange) || 'SMART';
+    const currency = (typeof entry === 'object' && entry?.currency) || 'USD';
     return {
       symbol: symbol.toUpperCase(),
       secType: SecType.STK,
@@ -264,7 +271,12 @@ class IbkrAdapter {
 
     const subscribed = [];
     for (const entry of symbols) {
-      const contract = this._contractFromSymbol(entry);
+      let contract;
+      try {
+        contract = this._contractFromSymbol(entry);
+      } catch {
+        continue;
+      }
       const sym = contract.symbol;
       if (this.symbolToReqId.has(sym)) {
         subscribed.push(sym);
