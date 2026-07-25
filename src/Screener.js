@@ -41,7 +41,9 @@ function sectorFromWatchlistLabel(sectorText) {
   if (s.includes('tech') || s.includes('software') || s.includes('saas')) return 'tech';
   if (s.includes('energy') || s.includes('oil') || s.includes('commod')) return 'energy';
   if (s.includes('bank') || s.includes('financ') || s.includes('insur')) return 'financial';
-  return '';
+  if (s.includes('health') || s.includes('pharma') || s.includes('biotech')) return 'healthcare';
+  if (s.includes('consumer') || s.includes('staples') || s.includes('retail') || s.includes('industrial')) return 'consumer';
+  return 'core';
 }
 
 function buildRows(watchlist, journalIndex, weights) {
@@ -633,7 +635,7 @@ export default function Screener({
                   </button>
                   <button
                     type="button"
-                    onClick={() => onOpenScorecard?.(row.ticker, row.eval?.sectorId || row.sectorId || 'tech')}
+                    onClick={() => onOpenScorecard?.(row.ticker, row.eval?.sectorId || row.sectorId || 'core')}
                     style={{
                       padding: '6px 12px',
                       borderRadius: 6,

@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react';
 import {
   SECTORS,
   calcAvg,
-  defaultValues,
+  emptySectorNamesMap,
+  emptySectorValuesMap,
   getBand,
   getRating,
   getRatingColor,
   getScore,
+  mergeMetricValues,
 } from './scorecards/model';
 import { getScorecardEval, upsertScorecardEval } from './scorecards/storage';
 import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
@@ -61,22 +63,14 @@ const MetricInput = ({ metric, value, onChange, accent }) => {
 
 export default function Scorecards({ focusTicker = '', focusSector = '', onOpenLibrary }) {
   const [activeSector, setActiveSector] = useState(
-    focusSector && SECTORS[focusSector] ? focusSector : 'tech',
+    focusSector && SECTORS[focusSector] ? focusSector : 'core',
   );
   const [compareMode, setCompareMode] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
-  const [allValuesA, setAllValuesA] = useState({
-    tech: defaultValues(SECTORS.tech.metrics),
-    energy: defaultValues(SECTORS.energy.metrics),
-    financial: defaultValues(SECTORS.financial.metrics),
-  });
-  const [allValuesB, setAllValuesB] = useState({
-    tech: defaultValues(SECTORS.tech.metrics),
-    energy: defaultValues(SECTORS.energy.metrics),
-    financial: defaultValues(SECTORS.financial.metrics),
-  });
-  const [stockNameA, setStockNameA] = useState({ tech: "", energy: "", financial: "" });
-  const [stockNameB, setStockNameB] = useState({ tech: "", energy: "", financial: "" });
+  const [allValuesA, setAllValuesA] = useState(emptySectorValuesMap);
+  const [allValuesB, setAllValuesB] = useState(emptySectorValuesMap);
+  const [stockNameA, setStockNameA] = useState(emptySectorNamesMap);
+  const [stockNameB, setStockNameB] = useState(emptySectorNamesMap);
 
   const sector = SECTORS[activeSector];
   const valuesA = allValuesA[activeSector];
@@ -105,7 +99,10 @@ export default function Scorecards({ focusTicker = '', focusSector = '', onOpenL
     setStockNameA((prev) => ({ ...prev, [sectorId]: ticker }));
     const saved = getScorecardEval(ticker, sectorId);
     if (saved?.values) {
-      setAllValuesA((prev) => ({ ...prev, [sectorId]: saved.values }));
+      setAllValuesA((prev) => ({
+        ...prev,
+        [sectorId]: mergeMetricValues(sectorId, saved.values),
+      }));
     }
   }, [focusTicker, focusSector]); // eslint-disable-line react-hooks/exhaustive-deps -- load once per navigation focus
 
@@ -135,6 +132,9 @@ export default function Scorecards({ focusTicker = '', focusSector = '', onOpenL
         <div>
           <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 4 }}>Fundamental Analysis</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>Sector Scorecards</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginTop: 6, maxWidth: 520 }}>
+            Start with <strong style={{ color: '#94a3b8' }}>Core Equity</strong> for broker-style valuation and quality, then use a sector template. Enter figures from your broker or filings (manual until data API).
+          </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {saveMsg && (

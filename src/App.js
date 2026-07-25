@@ -366,7 +366,7 @@ function App() {
                 refreshTradingData();
               }}
               onOpenScorecard={(sym, sector) => {
-                setScorecardFocus({ ticker: sym, sector: sector || 'tech' });
+                setScorecardFocus({ ticker: sym, sector: sector || 'core' });
                 setActivePage('scorecard');
               }}
               onOpenJournal={() => setActivePage('journal')}
@@ -411,7 +411,7 @@ function App() {
                 setActivePage('scorecard');
               }}
               onOpenScorecard={(sym, sector) => {
-                setScorecardFocus({ ticker: sym, sector: sector || 'tech' });
+                setScorecardFocus({ ticker: sym, sector: sector || 'core' });
                 setActivePage('scorecard');
               }}
               onOpenTerminal={(sym) => {
@@ -440,7 +440,7 @@ function App() {
                 setActivePage('terminal');
               }}
               onOpenScorecard={(sym, sector) => {
-                setScorecardFocus({ ticker: sym, sector: sector || 'tech' });
+                setScorecardFocus({ ticker: sym, sector: sector || 'core' });
                 setActivePage('scorecard');
               }}
             />

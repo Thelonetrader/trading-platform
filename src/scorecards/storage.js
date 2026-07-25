@@ -1,5 +1,5 @@
 import { readJson } from '../utils/storageStats';
-import { SECTORS, calcAvg, getRating } from './model';
+import { SECTORS, calcAvg, getRating, mergeMetricValues } from './model';
 
 const STORAGE_KEY = 'scorecardEvals';
 
@@ -14,7 +14,8 @@ export function upsertScorecardEval({ ticker, sectorId, values, displayName }) {
   const tickerU = String(ticker).trim().toUpperCase();
   if (!tickerU) return null;
 
-  const avg = calcAvg(sector.metrics, values);
+  const mergedValues = mergeMetricValues(sectorId, values);
+  const avg = calcAvg(sector.metrics, mergedValues);
   const rating = getRating(avg);
   const id = `${tickerU}:${sectorId}`;
 
@@ -23,7 +24,7 @@ export function upsertScorecardEval({ ticker, sectorId, values, displayName }) {
     ticker: tickerU,
     sectorId,
     displayName: (displayName || tickerU).trim() || tickerU,
-    values,
+    values: mergedValues,
     avg,
     ratingLabel: rating.label,
     ratingShort: rating.short,

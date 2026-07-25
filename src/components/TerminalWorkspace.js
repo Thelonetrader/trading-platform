@@ -297,7 +297,7 @@ export default function TerminalWorkspace({
                       <button
                         type="button"
                         style={btnGhost}
-                        onClick={() => onOpenScorecard(symbol, scorecard?.sectorId || 'tech')}
+                        onClick={() => onOpenScorecard(symbol, scorecard?.sectorId || 'core')}
                       >
                         {scorecard ? 'Update' : 'Score'}
                       </button>
