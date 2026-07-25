@@ -112,6 +112,7 @@ class FmpClient {
               mktCap: profile.mktCap,
               price: profile.price,
               beta: profile.beta,
+              exchange: profile.exchangeShortName || profile.exchange || null,
             }
           : null,
         error: fieldCount ? null : 'No ratio fields returned for this symbol',

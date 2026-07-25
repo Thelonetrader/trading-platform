@@ -382,10 +382,13 @@ export default function TerminalWorkspace({
           symbol={symbol}
           exchange={exchange}
           currency={currency}
+          quote={quote}
+          securityName={watch?.name}
           connection={connection}
           settings={settings}
           preset={orderPreset}
           onPlaced={onOrderPlaced}
+          fetchFundamentals={fetchFundamentals}
         />
       </div>
       <OpenOrdersPanel
