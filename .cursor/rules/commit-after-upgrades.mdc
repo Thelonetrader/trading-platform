@@ -1,0 +1,14 @@
+---
+description: Git commit after completing feature upgrades in this repo
+alwaysApply: true
+---
+
+# Save work after upgrades
+
+When you finish a user-requested feature, fix, or meaningful upgrade in this project:
+
+1. Create a **git commit** with a clear message (unless the user says not to commit, or there are no changes).
+2. Do **not** commit secrets (`.env`, credentials).
+3. Do **not** push unless the user asks.
+
+Tell the user the commit hash and that the working tree is clean (or what remains uncommitted).
