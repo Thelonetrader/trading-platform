@@ -66,8 +66,13 @@ export default function QuoteStrip({ symbols, activeSymbol, quotes, connection, 
         </span>
       )}
       {waitingTicks && (
-        <span style={{ flexShrink: 0, color: '#64748b', fontSize: 11 }} title={connection.error || ''}>
-          Waiting for market data… (delayed/paper subscriptions)
+        <span
+          style={{ flexShrink: 0, color: connection.error ? '#f59e0b' : '#64748b', fontSize: 11, maxWidth: 360 }}
+          title={connection.error || 'Subscribed — waiting for first tick from IB'}
+        >
+          {connection.error
+            ? connection.error.slice(0, 120)
+            : 'Waiting for market data… (reconnect if this persists)'}
         </span>
       )}
       {stripSymbols.map((sym) => {

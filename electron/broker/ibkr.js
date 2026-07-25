@@ -11,6 +11,17 @@ const TICK_LAST = 4;
 const TICK_CLOSE = 9;
 const TICK_BID = 1;
 const TICK_ASK = 2;
+const TICK_DELAYED_BID = 66;
+const TICK_DELAYED_ASK = 67;
+const TICK_DELAYED_LAST = 68;
+const TICK_DELAYED_CLOSE = 72;
+
+function mapTickPrice(tickType, price, patch) {
+  if (tickType === TICK_LAST || tickType === TICK_DELAYED_LAST) patch.last = price;
+  if (tickType === TICK_CLOSE || tickType === TICK_DELAYED_CLOSE) patch.close = price;
+  if (tickType === TICK_BID || tickType === TICK_DELAYED_BID) patch.bid = price;
+  if (tickType === TICK_ASK || tickType === TICK_DELAYED_ASK) patch.ask = price;
+}
 
 class IbkrAdapter {
   constructor() {
@@ -101,12 +112,24 @@ class IbkrAdapter {
         /* socket open */
       });
 
-      ib.on(EventName.error, (err, code) => {
+      ib.on(EventName.error, (err, code, reqId) => {
+        const msg = err?.message || String(err);
         if (code === ErrorCode.CONNECT_FAIL) {
           clearTimeout(timeout);
           fail(err);
-        } else if (code !== ErrorCode.NO_SECURITY_DEFINITION) {
-          this.lastError = err?.message || String(err);
+          return;
+        }
+        if (code !== ErrorCode.NO_SECURITY_DEFINITION) {
+          this.lastError = msg;
+          if (this.status === 'connected' && reqId != null && this.reqIdToSymbol.has(reqId)) {
+            if (this.onStatusChange) {
+              this.onStatusChange({
+                status: this.status,
+                error: msg,
+                mode: this.settings.mode || 'paper',
+              });
+            }
+          }
         }
       });
 
@@ -135,10 +158,7 @@ class IbkrAdapter {
         const symbol = this.reqIdToSymbol.get(reqId);
         if (!symbol || price === undefined || Number.isNaN(price) || price <= 0) return;
         const patch = {};
-        if (tickType === TICK_LAST) patch.last = price;
-        if (tickType === TICK_CLOSE) patch.close = price;
-        if (tickType === TICK_BID) patch.bid = price;
-        if (tickType === TICK_ASK) patch.ask = price;
+        mapTickPrice(tickType, price, patch);
         if (Object.keys(patch).length) {
           const q = this.quotes.get(symbol);
           const close = patch.close ?? q?.close;

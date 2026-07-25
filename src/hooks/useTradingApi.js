@@ -37,7 +37,7 @@ export function useTradingApi() {
     api.getSettings().then((s) => {
       if (mounted) setSettingsState(s);
     });
-    const offStatus = api.onConnectionStatus((s) => setConnection(s));
+    const offStatus = api.onConnectionStatus((s) => setConnection((prev) => ({ ...prev, ...s })));
     const offQuote = api.onQuote((q) => {
       setQuotes((prev) => ({ ...prev, [q.symbol]: q }));
     });
