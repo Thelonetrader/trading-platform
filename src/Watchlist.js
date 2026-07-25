@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
+import { dispatchWatchlistChanged } from './utils/liveSubscribe';
 import { displayChangePct, displayPrice, quoteForSymbol } from './utils/quoteDisplay';
 
 function Watchlist({ quotes = {}, onSelectSymbol }) {
@@ -30,6 +31,7 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
     const newStocks = [{ ...form, id: Date.now(), addedDate: new Date().toISOString().split('T')[0] }, ...stocks];
     setStocks(newStocks);
     localStorage.setItem('watchlist', JSON.stringify(newStocks));
+    dispatchWatchlistChanged();
     setForm({ ticker: '', name: '', sector: '', buyPrice: '', notes: '', priority: 'Medium', exchange: 'SMART', currency: 'USD', tags: '' });
     setShowForm(false);
   };
@@ -38,6 +40,7 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
     const newStocks = stocks.filter(s => s.id !== id);
     setStocks(newStocks);
     localStorage.setItem('watchlist', JSON.stringify(newStocks));
+    dispatchWatchlistChanged();
   };
 
   const priorityColor = (p) => p === 'High' ? '#ef4444' : p === 'Medium' ? '#f59e0b' : '#22c55e';

@@ -14,6 +14,7 @@ import { applyFundamentalsToSector, countAppliedMetrics } from './scorecards/app
 import { getScorecardEval, upsertScorecardEval } from './scorecards/storage';
 import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
 import { readJson } from './utils/storageStats';
+import { displayChangePct, displayPrice, quoteForSymbol } from './utils/quoteDisplay';
 
 function looksLikeTicker(raw) {
   const s = (raw || '').trim();
@@ -81,6 +82,9 @@ export default function Scorecards({
   connection,
   isElectron = false,
   fetchFundamentals,
+  hasFmpKey = false,
+  quotes = {},
+  onLiveTickerChange,
 }) {
   const [activeSector, setActiveSector] = useState(
     focusSector && SECTORS[focusSector] ? focusSector : 'core',
@@ -130,12 +134,14 @@ export default function Scorecards({
     }
   }, [focusTicker, focusSector]); // eslint-disable-line react-hooks/exhaustive-deps -- load once per navigation focus
 
+  const canFetchFundamentals = connection?.status === 'connected' || hasFmpKey;
+
   const pullFundamentals = useCallback(
     async (tickerRaw, sectorId, { force = false } = {}) => {
       const ticker = (tickerRaw || '').trim();
       if (!looksLikeTicker(ticker) || !fetchFundamentals) return;
-      if (connection?.status !== 'connected') {
-        setFundamentalMsg('Connect IB in Settings to auto-fill fundamentals');
+      if (!canFetchFundamentals) {
+        setFundamentalMsg('Add FMP API key or connect IB in Settings');
         return;
       }
 
@@ -146,7 +152,7 @@ export default function Scorecards({
       if (!force && lastFundamentalKey.current === key) return;
 
       setFundamentalLoading(true);
-      setFundamentalMsg('Loading IB fundamentals…');
+      setFundamentalMsg('Loading fundamentals…');
       try {
         const res = await fetchFundamentals(entryForTicker(ticker));
         const applied = countAppliedMetrics(sectorId, res.metrics);
@@ -156,7 +162,13 @@ export default function Scorecards({
             [sectorId]: applyFundamentalsToSector(sectorId, prev[sectorId], res.metrics),
           }));
           lastFundamentalKey.current = key;
-          setFundamentalMsg(`Filled ${applied} metric${applied === 1 ? '' : 's'} from IB (Reuters)`);
+          const src =
+            res.sources?.includes('fmp') && res.sources?.includes('ib')
+              ? 'FMP + IB'
+              : res.sources?.includes('fmp')
+                ? 'FMP'
+                : 'IB';
+          setFundamentalMsg(`Filled ${applied} metric${applied === 1 ? '' : 's'} from ${src}`);
         } else {
           setFundamentalMsg(res.error || 'No matching ratio fields for this template');
         }
@@ -167,7 +179,7 @@ export default function Scorecards({
         setTimeout(() => setFundamentalMsg(''), 5000);
       }
     },
-    [connection?.status, fetchFundamentals],
+    [canFetchFundamentals, fetchFundamentals],
   );
 
   const hasSavedResearch =
@@ -184,6 +196,32 @@ export default function Scorecards({
     }, 800);
     return () => clearTimeout(t);
   }, [nameA, activeSector, autoFillIb, compareMode, pullFundamentals]);
+
+  useEffect(() => {
+    if (!onLiveTickerChange || compareMode) {
+      onLiveTickerChange?.('');
+      return;
+    }
+    const ticker = (nameA || '').trim();
+    if (!looksLikeTicker(ticker)) {
+      onLiveTickerChange('');
+      return;
+    }
+    onLiveTickerChange(ticker.toUpperCase());
+  }, [nameA, compareMode, onLiveTickerChange]);
+
+  useEffect(() => {
+    if (!autoFillIb || compareMode || !canFetchFundamentals) return;
+    const ticker = (nameA || '').trim();
+    if (!looksLikeTicker(ticker)) return;
+    const tickerU = ticker.toUpperCase();
+    if (getScorecardEval(tickerU, activeSector)) return;
+    pullFundamentals(ticker, activeSector, { force: true });
+  }, [connection?.status, canFetchFundamentals]); // eslint-disable-line react-hooks/exhaustive-deps -- refresh when data sources ready
+
+  const liveQuote = looksLikeTicker(nameA) ? quoteForSymbol(quotes, nameA) : null;
+  const livePrice = displayPrice(liveQuote);
+  const liveChg = displayChangePct(liveQuote);
 
   const handleSaveEval = () => {
     const ticker = (nameA || focusTicker || '').trim();
@@ -303,6 +341,21 @@ export default function Scorecards({
           <input value={nameA} onChange={e => setStockNameA(prev => ({ ...prev, [activeSector]: e.target.value.toUpperCase() }))}
             placeholder={compareMode ? "Stock A ticker" : `Ticker (${sector.label})`}
             style={inputStyle} />
+          {livePrice != null && !compareMode && (
+            <div style={{ marginTop: 8, fontSize: 13, color: '#94a3b8' }}>
+              Live{' '}
+              <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{livePrice.toFixed(2)}</span>
+              {liveChg != null && (
+                <span style={{ marginLeft: 8, color: liveChg >= 0 ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
+                  {liveChg >= 0 ? '+' : ''}
+                  {liveChg.toFixed(2)}%
+                </span>
+              )}
+              {connection?.status !== 'connected' && livePrice == null && (
+                <span style={{ marginLeft: 8, color: '#64748b' }}>Connect IB for live price</span>
+              )}
+            </div>
+          )}
         </div>
         {compareMode && (
           <div>
@@ -316,11 +369,11 @@ export default function Scorecards({
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 20 }}>
           <label style={{ fontSize: 12, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 6 }}>
             <input type="checkbox" checked={autoFillIb} onChange={(e) => setAutoFillIb(e.target.checked)} />
-            Auto-fill from IB for new tickers only
+            Auto-fill fundamentals for new tickers (FMP or IB)
           </label>
           <button
             type="button"
-            disabled={fundamentalLoading || !looksLikeTicker(nameA) || connection?.status !== 'connected'}
+            disabled={fundamentalLoading || !looksLikeTicker(nameA) || !canFetchFundamentals}
             onClick={() => pullFundamentals(nameA, activeSector, { force: true })}
             style={{
               padding: '6px 12px',
@@ -333,20 +386,20 @@ export default function Scorecards({
               cursor: fundamentalLoading ? 'wait' : 'pointer',
             }}
           >
-            {fundamentalLoading ? 'Loading…' : 'Refresh from IB'}
+            {fundamentalLoading ? 'Loading…' : 'Refresh fundamentals'}
           </button>
           {fundamentalMsg && (
             <span style={{ fontSize: 12, color: fundamentalMsg.includes('Filled') ? '#22c55e' : '#94a3b8' }}>
               {fundamentalMsg}
             </span>
           )}
-          {hasSavedResearch && connection?.status === 'connected' && (
+          {hasSavedResearch && canFetchFundamentals && (
             <span style={{ fontSize: 11, color: '#64748b' }}>
-              Loaded from research library — use Refresh from IB to replace with live ratios
+              Loaded from research library — use Refresh to replace with live ratios
             </span>
           )}
-          {connection?.status !== 'connected' && (
-            <span style={{ fontSize: 11, color: '#64748b' }}>Live prices need IB; fundamentals need IB + Reuters subscription</span>
+          {!canFetchFundamentals && (
+            <span style={{ fontSize: 11, color: '#64748b' }}>Add FMP key in Settings and/or connect IB for quotes</span>
           )}
         </div>
       )}

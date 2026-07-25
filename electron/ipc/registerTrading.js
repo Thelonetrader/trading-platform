@@ -19,13 +19,16 @@ function registerTradingIpc() {
 
   ipcMain.handle('trading:getSettings', async () => {
     const store = await getStore();
-    return { ib: store.get('ib') };
+    return { ib: store.get('ib'), marketData: store.get('marketData') };
   });
 
-  ipcMain.handle('trading:setSettings', async (_e, { ib }) => {
+  ipcMain.handle('trading:setSettings', async (_e, { ib, marketData }) => {
     const store = await getStore();
     if (ib) store.set('ib', { ...store.get('ib'), ...ib });
-    return { ib: store.get('ib') };
+    if (marketData) store.set('marketData', { ...store.get('marketData'), ...marketData });
+    const saved = { ib: store.get('ib'), marketData: store.get('marketData') };
+    broker.applyIbSettings(saved.ib);
+    return saved;
   });
 
   ipcMain.handle('trading:getConnectionStatus', async () => broker.getConnectionStatus());
@@ -53,6 +56,10 @@ function registerTradingIpc() {
   ipcMain.handle('trading:getAccountSummary', async () => broker.getAccountSummary());
 
   ipcMain.handle('trading:getFundamentals', async (_e, entry) => broker.getFundamentals(entry || {}));
+
+  ipcMain.handle('trading:getHistoricalBars', async (_e, entry, options) =>
+    broker.getHistoricalBars(entry || {}, options || {}),
+  );
 }
 
 module.exports = { registerTradingIpc, broker };

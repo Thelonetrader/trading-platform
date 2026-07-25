@@ -11,7 +11,7 @@ import {
 
 const MIN_INTERVAL_MS = 60_000;
 
-export function useAlertNotifications() {
+export function useAlertNotifications(quotes = {}) {
   useEffect(() => {
     let intervalId = null;
 
@@ -19,7 +19,7 @@ export function useAlertNotifications() {
       const prefs = getAlertNotifyPrefs();
       if (!prefs.enabled) return;
 
-      const evaluations = evaluateAllRules(rankAllWatchlistItems());
+      const evaluations = evaluateAllRules(rankAllWatchlistItems(quotes), quotes);
       const { lastFingerprint } = getAlertNotifyState();
       const { fingerprint, didNotify } = tickAlertNotifications(
         evaluations,
@@ -51,5 +51,5 @@ export function useAlertNotifications() {
       window.removeEventListener(RESEARCH_DATA_IMPORTED_EVENT, schedule);
       window.removeEventListener('alert-notify-prefs-changed', schedule);
     };
-  }, []);
+  }, [quotes]);
 }

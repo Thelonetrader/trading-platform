@@ -19,6 +19,7 @@ export default function Settings({
   onConnect,
   onDisconnect,
   onDataImported,
+  onTestFmp,
 }) {
   const [form, setForm] = useState({
     host: '127.0.0.1',
@@ -29,6 +30,7 @@ export default function Settings({
     useTws: false,
     marketDataType: 3,
   });
+  const [mdForm, setMdForm] = useState({ fmpApiKey: '', cacheTtlMinutes: 60 });
   const [message, setMessage] = useState(null);
   const [includeBrokerExport, setIncludeBrokerExport] = useState(false);
   const [importMode, setImportMode] = useState('merge');
@@ -38,6 +40,9 @@ export default function Settings({
   useEffect(() => {
     if (settings?.ib) {
       setForm((f) => ({ ...f, ...settings.ib }));
+    }
+    if (settings?.marketData) {
+      setMdForm((f) => ({ ...f, ...settings.marketData }));
     }
   }, [settings]);
 
@@ -52,16 +57,28 @@ export default function Settings({
 
   const save = async () => {
     setMessage(null);
-    await onSave(form);
+    await onSave({ ib: form, marketData: mdForm });
     setMessage('Settings saved.');
   };
 
   const connect = async () => {
     setMessage(null);
     try {
-      await onSave(form);
+      await onSave({ ib: form, marketData: mdForm });
       await onConnect();
       setMessage('Connected to IB Gateway.');
+    } catch (e) {
+      setMessage(e.message || String(e));
+    }
+  };
+
+  const testFmp = async () => {
+    setMessage(null);
+    try {
+      await onSave({ ib: form, marketData: mdForm });
+      const res = await onTestFmp?.();
+      if (res?.ok) setMessage(`FMP connected (${res.sample || 'OK'})`);
+      else setMessage(res?.error || 'FMP test failed');
     } catch (e) {
       setMessage(e.message || String(e));
     }
@@ -110,7 +127,7 @@ export default function Settings({
       const { broker } = applyResearchImport(payload, importMode);
 
       if (importBroker && broker) {
-        await onSave(broker);
+        await onSave({ ib: broker, marketData: mdForm });
         setForm((f) => ({ ...f, ...broker }));
       }
 
@@ -128,6 +145,26 @@ export default function Settings({
 
   return (
     <div style={{ maxWidth: 520 }}>
+      {!(mdForm.fmpApiKey || '').trim() && (
+        <div
+          style={{
+            marginBottom: 20,
+            padding: 14,
+            borderRadius: 10,
+            background: '#6366f114',
+            border: '1px solid #6366f140',
+            fontSize: 13,
+            color: '#cbd5e1',
+            lineHeight: 1.5,
+          }}
+        >
+          <strong style={{ color: '#818cf8' }}>FMP API key</strong> — scroll to{' '}
+          <strong style={{ color: '#f1f5f9' }}>Market data (Phase 2)</strong> below, paste your key, then click{' '}
+          <strong style={{ color: '#f1f5f9' }}>Save market data</strong> and <strong style={{ color: '#f1f5f9' }}>Test FMP</strong>.
+          Use the Electron app (<code style={{ fontSize: 12 }}>npm run electron:dev</code>), not browser-only{' '}
+          <code style={{ fontSize: 12 }}>npm start</code>.
+        </div>
+      )}
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
           Broker connection
@@ -195,7 +232,7 @@ export default function Settings({
       </label>
 
       <label style={{ display: 'block', marginBottom: 16, fontSize: 11, color: '#64748b' }}>
-        Market data type (reconnect after change)
+        Market data type (applies on Save when connected, or reconnect)
         <select
           value={form.marketDataType ?? 3}
           onChange={(e) => setForm((f) => ({ ...f, marketDataType: Number(e.target.value) }))}
@@ -228,6 +265,47 @@ export default function Settings({
           Live mode sends real orders. Double-check port and account before connecting.
         </div>
       )}
+
+      <div style={{ marginTop: 40, paddingTop: 28, borderTop: '1px solid #1a2035' }}>
+        <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+          Market data (Phase 2)
+        </div>
+        <div style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', marginTop: 4 }}>Financial Modeling Prep</div>
+        <p style={{ fontSize: 13, color: '#64748b', marginTop: 8, lineHeight: 1.5 }}>
+          Powers scorecard auto-fill (without IB Reuters), News & sentiment, and earnings dates. Key stays in local
+          Electron storage — not included in research backup export.
+        </p>
+        <label style={{ display: 'block', marginTop: 16, marginBottom: 12, fontSize: 11, color: '#64748b' }}>
+          FMP API key
+          <input
+            type="password"
+            autoComplete="off"
+            value={mdForm.fmpApiKey || ''}
+            onChange={(e) => setMdForm((f) => ({ ...f, fmpApiKey: e.target.value.trim() }))}
+            placeholder="From financialmodelingprep.com/developer"
+            style={fieldStyle}
+          />
+        </label>
+        <label style={{ display: 'block', marginBottom: 16, fontSize: 11, color: '#64748b' }}>
+          Cache TTL (minutes)
+          <input
+            type="number"
+            min={5}
+            max={1440}
+            value={mdForm.cacheTtlMinutes ?? 60}
+            onChange={(e) => setMdForm((f) => ({ ...f, cacheTtlMinutes: Number(e.target.value) || 60 }))}
+            style={fieldStyle}
+          />
+        </label>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <button type="button" onClick={save} style={btnSecondary}>
+            Save market data
+          </button>
+          <button type="button" onClick={testFmp} style={btnSecondary}>
+            Test FMP
+          </button>
+        </div>
+      </div>
 
       <div style={{ marginTop: 40, paddingTop: 28, borderTop: '1px solid #1a2035' }}>
         <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em' }}>

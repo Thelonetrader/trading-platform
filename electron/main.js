@@ -1,6 +1,7 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
-const { registerTradingIpc } = require('./ipc/registerTrading');
+const { registerTradingIpc, broker } = require('./ipc/registerTrading');
+const { registerMarketDataIpc } = require('./ipc/registerMarketData');
 
 const isDev = !app.isPackaged && process.env.ELECTRON_DEV !== '0';
 const appRoot = path.join(__dirname, '..');
@@ -30,6 +31,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   registerTradingIpc();
+  registerMarketDataIpc(broker);
   createWindow();
 
   app.on('activate', () => {

@@ -1,5 +1,6 @@
 import { readJson } from './storageStats';
 import { parseTags } from './customRank';
+import { displayChangePct, displayPrice, quoteForSymbol } from './quoteDisplay';
 
 export const ALERT_RULES_KEY = 'alertRules';
 
@@ -31,6 +32,11 @@ export function upsertAlertRule(rule) {
     requireScorecard: !!rule.requireScorecard,
     tagMatch: (rule.tagMatch || '').trim().toLowerCase(),
     sectorContains: (rule.sectorContains || '').trim().toLowerCase(),
+    minDayChangePct: rule.minDayChangePct === '' || rule.minDayChangePct == null ? null : Number(rule.minDayChangePct),
+    maxDayChangePct: rule.maxDayChangePct === '' || rule.maxDayChangePct == null ? null : Number(rule.maxDayChangePct),
+    minPrice: rule.minPrice === '' || rule.minPrice == null ? null : Number(rule.minPrice),
+    maxPrice: rule.maxPrice === '' || rule.maxPrice == null ? null : Number(rule.maxPrice),
+    minPctAboveBuy: rule.minPctAboveBuy === '' || rule.minPctAboveBuy == null ? null : Number(rule.minPctAboveBuy),
   };
   const idx = list.findIndex((r) => r.id === entry.id);
   if (idx >= 0) list[idx] = entry;
@@ -63,15 +69,44 @@ export function evaluateRule(rule, ctx) {
     if (!ctx.eval || ctx.eval.avg < minAvg) return false;
   }
 
+  const needsQuote =
+    rule.minDayChangePct != null ||
+    rule.maxDayChangePct != null ||
+    rule.minPrice != null ||
+    rule.maxPrice != null ||
+    rule.minPctAboveBuy != null;
+
+  if (needsQuote) {
+    const q = ctx.quote;
+    const price = displayPrice(q);
+    const chg = displayChangePct(q);
+    if (rule.minDayChangePct != null && (chg == null || chg < rule.minDayChangePct)) return false;
+    if (rule.maxDayChangePct != null && (chg == null || chg > rule.maxDayChangePct)) return false;
+    if (rule.minPrice != null && (price == null || price < rule.minPrice)) return false;
+    if (rule.maxPrice != null && (price == null || price > rule.maxPrice)) return false;
+    if (rule.minPctAboveBuy != null) {
+      const buy = parseFloat(ctx.watch?.buyPrice);
+      if (!Number.isFinite(buy) || buy <= 0 || price == null) return false;
+      const pctAbove = ((price - buy) / buy) * 100;
+      if (pctAbove < rule.minPctAboveBuy) return false;
+    }
+  }
+
   return true;
 }
 
-/** @param {ReturnType<import('./customRank').rankAllWatchlistItems>} contexts - or pass watchlist ranked items */
-export function evaluateAllRules(contexts) {
+/** @param {ReturnType<import('./customRank').rankAllWatchlistItems>} contexts */
+export function evaluateAllRules(contexts, quotes = {}) {
   const rules = listAlertRules().filter((r) => r.enabled);
   return rules.map((rule) => ({
     rule,
-    matches: contexts.filter((ctx) => evaluateRule(rule, ctx)),
+    matches: contexts.filter((ctx) => {
+      const withQuote = {
+        ...ctx,
+        quote: ctx.quote ?? quoteForSymbol(quotes, ctx.ticker),
+      };
+      return evaluateRule(rule, withQuote);
+    }),
   }));
 }
 
@@ -85,4 +120,9 @@ export const DEFAULT_RULE_TEMPLATE = {
   requireScorecard: true,
   tagMatch: '',
   sectorContains: '',
+  minDayChangePct: null,
+  maxDayChangePct: null,
+  minPrice: null,
+  maxPrice: null,
+  minPctAboveBuy: null,
 };

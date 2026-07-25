@@ -5,7 +5,7 @@ import {
   holdingUsesLiveQuote,
 } from './utils/portfolioPricing';
 
-function Portfolio({ connection, quotes = {}, onOpenTerminal, subscribeSymbols }) {
+function Portfolio({ connection, quotes = {}, onOpenTerminal }) {
   const loadHoldings = () => {
     const saved = localStorage.getItem('portfolio');
     return saved ? JSON.parse(saved) : [];
@@ -67,23 +67,6 @@ function Portfolio({ connection, quotes = {}, onOpenTerminal, subscribeSymbols }
       .catch(() => setBrokerPositions([]))
       .finally(() => setLoadingBroker(false));
   }, [tab, connection?.status]);
-
-  const quoteSymbols = useMemo(() => {
-    const s = new Set();
-    holdings.forEach((h) => {
-      if (h.ticker) s.add(h.ticker.toUpperCase());
-    });
-    brokerPositions.forEach((p) => {
-      if (p.symbol) s.add(p.symbol.toUpperCase());
-    });
-    return [...s];
-  }, [holdings, brokerPositions]);
-
-  useEffect(() => {
-    if (connection?.status === 'connected' && quoteSymbols.length && subscribeSymbols) {
-      subscribeSymbols(quoteSymbols);
-    }
-  }, [connection?.status, quoteSymbols, subscribeSymbols]);
 
   const unifiedRows = useMemo(() => {
     const rows = [];

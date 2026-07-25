@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import TerminalChart from './TerminalChart';
 import OrderTicket from './OrderTicket';
 import OpenOrdersPanel from './OpenOrdersPanel';
 import { RESEARCH_DATA_IMPORTED_EVENT } from '../utils/dataBackup';
@@ -156,6 +157,7 @@ export default function TerminalWorkspace({
   onOpenWatchlist,
   onSymbolChange,
   researchVersion = 0,
+  fetchHistoricalBars,
 }) {
   const [research, setResearch] = useState(null);
 
@@ -243,19 +245,26 @@ export default function TerminalWorkspace({
               Pick a symbol above, from Watchlist or Screener, or press ⌘K.
             </div>
           ) : (
-            <div
-              style={{
-                flex: 1,
-                minHeight: 280,
-                background: '#0a0f1e',
-                border: '1px solid #1a2035',
-                borderRadius: 12,
-                padding: 16,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-              }}
-            >
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 280 }}>
+              <TerminalChart
+                symbol={symbol}
+                exchange={exchange}
+                currency={currency}
+                connection={connection}
+                fetchHistoricalBars={fetchHistoricalBars}
+              />
+              <div
+                style={{
+                  flex: 1,
+                  background: '#0a0f1e',
+                  border: '1px solid #1a2035',
+                  borderRadius: 12,
+                  padding: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 12,
+                }}
+              >
               <div style={{ fontSize: 11, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
                 Research workspace
               </div>
@@ -351,8 +360,9 @@ export default function TerminalWorkspace({
                 </ResearchCard>
               </div>
               <div style={{ fontSize: 11, color: '#334155', borderTop: '1px solid #1a2035', paddingTop: 10 }}>
-                Charts and live quotes when IB data is configured — execute in TWS if you prefer.
+                Daily / weekly bars from IB · orders execute via ticket or TWS
               </div>
+            </div>
             </div>
           )}
         </div>

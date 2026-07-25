@@ -3,6 +3,7 @@ import Journal from './Journal';
 import Watchlist from './Watchlist';
 import Portfolio from './Portfolio';
 import Scorecards from './Scorecards';
+import News from './News';
 import ScorecardLibrary from './ScorecardLibrary';
 import Screener from './Screener';
 import Alerts from './Alerts';
@@ -12,6 +13,7 @@ import TerminalWorkspace from './components/TerminalWorkspace';
 import AccountStrip from './components/AccountStrip';
 import Settings from './components/Settings';
 import { useTradingApi } from './hooks/useTradingApi';
+import { useMarketData } from './hooks/useMarketData';
 import { useAlertNotifications } from './hooks/useAlertNotifications';
 import { parseCommand } from './utils/parseCommand';
 import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
@@ -22,7 +24,7 @@ import {
   getWatchlistSymbols,
   readJson,
 } from './utils/storageStats';
-import { getPortfolioSubscribeSymbols } from './utils/portfolioPricing';
+import { mergeLiveSubscribeSymbols, WATCHLIST_CHANGED_EVENT } from './utils/liveSubscribe';
 import { quoteForSymbol } from './utils/quoteDisplay';
 
 function App() {
@@ -37,6 +39,8 @@ function App() {
   const [terminalResearchVersion, setTerminalResearchVersion] = useState(0);
   const [cancelBusyId, setCancelBusyId] = useState(null);
   const [portfolioSubTick, setPortfolioSubTick] = useState(0);
+  const [scorecardLiveTicker, setScorecardLiveTicker] = useState('');
+  const [screenerExtraTickers, setScreenerExtraTickers] = useState([]);
 
   const {
     connection,
@@ -52,10 +56,14 @@ function App() {
     refreshTradingData,
     cancelOrder,
     fetchFundamentals,
+    fetchHistoricalBars,
     isElectron,
   } = useTradingApi();
 
-  useAlertNotifications();
+  const { testFmp, config: marketConfig } = useMarketData();
+  const hasFmpKey = !!(settings?.marketData?.fmpApiKey || marketConfig.fmpApiKey || '').trim();
+
+  useAlertNotifications(quotes);
 
   const openTerminalForTicker = useCallback((sym) => {
     const upper = (sym || '').trim().toUpperCase();
@@ -101,30 +109,41 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (activePage !== 'screener') setScreenerExtraTickers([]);
+  }, [activePage]);
+
+  useEffect(() => {
     const bump = () => setPortfolioSubTick((t) => t + 1);
     window.addEventListener(RESEARCH_DATA_IMPORTED_EVENT, bump);
     window.addEventListener('portfolio-changed', bump);
+    window.addEventListener(WATCHLIST_CHANGED_EVENT, bump);
     return () => {
       window.removeEventListener(RESEARCH_DATA_IMPORTED_EVENT, bump);
       window.removeEventListener('portfolio-changed', bump);
+      window.removeEventListener(WATCHLIST_CHANGED_EVENT, bump);
     };
   }, []);
 
   useEffect(() => {
     if (connection.status !== 'connected') return;
-    const syms = getWatchlistSymbols();
-    const portfolioSyms = getPortfolioSubscribeSymbols();
-    for (const p of portfolioSyms) {
-      if (!syms.some((s) => s.ticker === p.ticker)) syms.push(p);
-    }
-    if (activeSymbol) {
-      const inList = syms.some((s) => s.ticker === activeSymbol);
-      if (!inList) {
-        syms.push({ ticker: activeSymbol, ...activeContract });
-      }
-    }
+    const syms = mergeLiveSubscribeSymbols({
+      activeSymbol,
+      activeContract,
+      extraTickers: [
+        ...(scorecardLiveTicker ? [scorecardLiveTicker] : []),
+        ...screenerExtraTickers,
+      ],
+    });
     if (syms.length) subscribeSymbols(syms);
-  }, [connection.status, activeSymbol, activeContract, subscribeSymbols, portfolioSubTick]);
+  }, [
+    connection.status,
+    activeSymbol,
+    activeContract,
+    subscribeSymbols,
+    portfolioSubTick,
+    scorecardLiveTicker,
+    screenerExtraTickers,
+  ]);
 
   const runCommand = useCallback(
     (input) => {
@@ -165,6 +184,7 @@ function App() {
             addedDate: new Date().toISOString().split('T')[0],
           });
           localStorage.setItem('watchlist', JSON.stringify(list));
+          window.dispatchEvent(new Event(WATCHLIST_CHANGED_EVENT));
         }
         setActiveSymbol(cmd.symbol);
         setCommandOpen(false);
@@ -205,6 +225,7 @@ function App() {
     'screener',
     'alerts',
     'settings',
+    'news',
   ]);
 
   const connDot =
@@ -374,10 +395,16 @@ function App() {
               onOpenWatchlist={() => setActivePage('watchlist')}
               onSymbolChange={openTerminalForTicker}
               researchVersion={terminalResearchVersion}
+              fetchHistoricalBars={fetchHistoricalBars}
             />
           )}
           {activePage === 'dashboard' && (
-            <Dashboard onNavigate={setActivePage} portfolioStats={getPortfolioStats(quotes)} />
+            <Dashboard
+              onNavigate={setActivePage}
+              portfolioStats={getPortfolioStats(quotes)}
+              connection={connection}
+              accountSummary={accountSummary}
+            />
           )}
           {activePage === 'journal' && <Journal onOpenTerminal={openTerminalForTicker} />}
           {activePage === 'watchlist' && (
@@ -395,7 +422,6 @@ function App() {
               connection={connection}
               quotes={quotes}
               onOpenTerminal={openTerminalForTicker}
-              subscribeSymbols={subscribeSymbols}
             />
           )}
           {activePage === 'scorecard' && (
@@ -406,7 +432,13 @@ function App() {
               connection={connection}
               isElectron={isElectron}
               fetchFundamentals={fetchFundamentals}
+              hasFmpKey={hasFmpKey}
+              quotes={quotes}
+              onLiveTickerChange={setScorecardLiveTicker}
             />
+          )}
+          {activePage === 'news' && (
+            <News onOpenTerminal={openTerminalForTicker} />
           )}
           {activePage === 'scorecard-library' && (
             <ScorecardLibrary
@@ -438,6 +470,7 @@ function App() {
               refreshKey={screenerRefreshKey}
               quotes={quotes}
               connection={connection}
+              onUniverseTickersChange={setScreenerExtraTickers}
               onOpenTerminal={(sym, contract) => {
                 setActiveSymbol(sym);
                 if (contract) setActiveContract(contract);
@@ -451,6 +484,8 @@ function App() {
           )}
           {activePage === 'alerts' && (
             <Alerts
+              quotes={quotes}
+              connection={connection}
               onOpenTerminal={(sym, contract) => {
                 setActiveSymbol(sym);
                 if (contract?.exchange) {
@@ -471,6 +506,7 @@ function App() {
               onSave={saveSettings}
               onConnect={connect}
               onDisconnect={disconnect}
+              onTestFmp={testFmp}
               onDataImported={() => {
                 setScreenerRefreshKey((k) => k + 1);
                 window.dispatchEvent(new Event(RESEARCH_DATA_IMPORTED_EVENT));
@@ -493,18 +529,35 @@ function App() {
   );
 }
 
-function Dashboard({ onNavigate, portfolioStats }) {
+function Dashboard({ onNavigate, portfolioStats, connection, accountSummary = [] }) {
   const journalCount = getJournalCount();
   const watchCount = getWatchlistSymbols().length;
   const plSign = portfolioStats.plPct >= 0;
+  const ibConnected = connection?.status === 'connected';
+  const nlvRow = accountSummary.find((r) => r.tag === 'NetLiquidation' || r.tag === 'NetLiquidationByCurrency');
+  const nlv = nlvRow ? parseFloat(nlvRow.value) : null;
 
   const stats = [
     {
       label: 'Portfolio Value',
       value: formatGbp(portfolioStats.totalValue),
-      change: `${plSign ? '+' : ''}${portfolioStats.plPct.toFixed(2)}% vs cost`,
+      change: `${plSign ? '+' : ''}${portfolioStats.plPct.toFixed(2)}% vs cost${ibConnected ? ' · live marks' : ''}`,
       positive: plSign,
     },
+    ...(ibConnected && nlv != null && Number.isFinite(nlv)
+      ? [
+          {
+            label: 'IB Net Liquidation',
+            value: new Intl.NumberFormat('en-US', {
+              style: 'currency',
+              currency: nlvRow.currency || 'USD',
+              maximumFractionDigits: 0,
+            }).format(nlv),
+            change: 'From account summary',
+            positive: true,
+          },
+        ]
+      : []),
     {
       label: 'Watchlist Items',
       value: String(watchCount),

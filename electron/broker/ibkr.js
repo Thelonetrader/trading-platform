@@ -33,6 +33,7 @@ class IbkrAdapter {
     this.quotes = new Map();
     this.reqIdToSymbol = new Map();
     this.symbolToReqId = new Map();
+    this.symbolToContractKey = new Map();
     this.nextReqId = 1000;
     this.openOrders = [];
     this.positions = [];
@@ -273,6 +274,7 @@ class IbkrAdapter {
     } else {
       this.reqIdToSymbol.clear();
       this.symbolToReqId.clear();
+      this.symbolToContractKey.clear();
     }
     this.nextOrderId = null;
     this._setStatus('disconnected');
@@ -285,6 +287,23 @@ class IbkrAdapter {
       error: this.lastError,
       mode: this.settings.mode || 'paper',
     };
+  }
+
+  applyIbSettings(ibSettings) {
+    if (ibSettings) {
+      this.settings = { ...this.settings, ...ibSettings };
+    }
+    if (!this.ib || this.status !== 'connected') return;
+    const mdType = Number(this.settings.marketDataType);
+    try {
+      this.ib.reqMarketDataType(Number.isFinite(mdType) && mdType > 0 ? mdType : 3);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  _contractKey(contract) {
+    return `${contract.exchange || 'SMART'}|${contract.currency || 'USD'}`;
   }
 
   _contractFromSymbol(entry) {
@@ -306,27 +325,52 @@ class IbkrAdapter {
     };
   }
 
+  _cancelQuoteSubscription(sym) {
+    const reqId = this.symbolToReqId.get(sym);
+    if (reqId == null) return;
+    try {
+      this.ib?.cancelMktData(reqId);
+    } catch (_) {
+      /* ignore */
+    }
+    this.reqIdToSymbol.delete(reqId);
+    this.symbolToReqId.delete(sym);
+    this.symbolToContractKey.delete(sym);
+  }
+
   subscribeQuotes(symbols) {
     if (!this.ib || this.status !== 'connected') {
       return { subscribed: [] };
     }
 
-    const subscribed = [];
-    for (const entry of symbols) {
+    const desired = new Map();
+    for (const entry of symbols || []) {
       let contract;
       try {
         contract = this._contractFromSymbol(entry);
       } catch {
         continue;
       }
-      const sym = contract.symbol;
-      if (this.symbolToReqId.has(sym)) {
+      desired.set(contract.symbol, contract);
+    }
+
+    for (const sym of [...this.symbolToReqId.keys()]) {
+      if (!desired.has(sym)) this._cancelQuoteSubscription(sym);
+    }
+
+    const subscribed = [];
+    for (const [sym, contract] of desired) {
+      const ckey = this._contractKey(contract);
+      if (this.symbolToReqId.has(sym) && this.symbolToContractKey.get(sym) === ckey) {
         subscribed.push(sym);
         continue;
       }
+      if (this.symbolToReqId.has(sym)) this._cancelQuoteSubscription(sym);
+
       const reqId = this.nextReqId++;
       this.reqIdToSymbol.set(reqId, sym);
       this.symbolToReqId.set(sym, reqId);
+      this.symbolToContractKey.set(sym, ckey);
       if (!this.quotes.has(sym)) {
         this.quotes.set(sym, { symbol: sym });
       }
@@ -338,14 +382,8 @@ class IbkrAdapter {
 
   unsubscribeAllQuotes() {
     if (!this.ib) return;
-    for (const [sym, reqId] of this.symbolToReqId.entries()) {
-      try {
-        this.ib.cancelMktData(reqId);
-      } catch (_) {
-        /* ignore */
-      }
-      this.reqIdToSymbol.delete(reqId);
-      this.symbolToReqId.delete(sym);
+    for (const sym of [...this.symbolToReqId.keys()]) {
+      this._cancelQuoteSubscription(sym);
     }
   }
 
@@ -522,6 +560,80 @@ class IbkrAdapter {
         ? null
         : 'No ratio data from IB — enable fundamental data for this exchange in TWS / account subscriptions',
     };
+  }
+
+  getHistoricalBars(entry, options = {}) {
+    return new Promise((resolve) => {
+      if (!this.ib || this.status !== 'connected') {
+        resolve({ symbol: '', bars: [], error: 'Connect IB in Settings first' });
+        return;
+      }
+
+      let contract;
+      try {
+        contract = this._contractFromSymbol(entry);
+      } catch (e) {
+        resolve({ symbol: '', bars: [], error: e.message || 'Invalid symbol' });
+        return;
+      }
+
+      const duration = options.duration || '1 Y';
+      const barSize = options.barSize || '1 day';
+      const whatToShow = options.whatToShow || 'TRADES';
+      const reqId = this.nextReqId++;
+      const bars = [];
+
+      const finish = (error = null) => {
+        clearTimeout(timer);
+        this.ib.removeListener(EventName.historicalData, handler);
+        resolve({
+          symbol: contract.symbol,
+          bars,
+          error: error || (bars.length ? null : 'No bars returned from IB'),
+        });
+      };
+
+      const timer = setTimeout(() => finish('Historical data request timed out'), 30000);
+
+      const handler = (rid, time, open, high, low, close, volume) => {
+        if (rid !== reqId) return;
+        const t = String(time || '');
+        if (t === 'finished' || t.startsWith('finished')) {
+          finish(bars.length ? null : 'No bars returned from IB');
+          return;
+        }
+        const o = Number(open);
+        const h = Number(high);
+        const l = Number(low);
+        const c = Number(close);
+        if ([o, h, l, c].some((n) => Number.isNaN(n))) return;
+        bars.push({
+          time: t,
+          open: o,
+          high: h,
+          low: l,
+          close: c,
+          volume: Number(volume) || 0,
+        });
+      };
+
+      this.ib.on(EventName.historicalData, handler);
+      try {
+        this.ib.reqHistoricalData(
+          reqId,
+          contract,
+          '',
+          duration,
+          barSize,
+          whatToShow,
+          1,
+          1,
+          false,
+        );
+      } catch (e) {
+        finish(e.message || 'reqHistoricalData failed');
+      }
+    });
   }
 }
 

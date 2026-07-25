@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
+import { WATCHLIST_CHANGED_EVENT } from './utils/liveSubscribe';
 import { readJson } from './utils/storageStats';
 import { getJournalIndexByTicker } from './utils/journalIndex';
 import {
@@ -8,8 +10,10 @@ import {
   saveScreenerPreset,
 } from './utils/screenerPresets';
 import { SECTORS, getRatingColor } from './scorecards/model';
-import { getBestEvalForTicker, listScorecardEvals } from './scorecards/storage';
-import { computeCustomRank, getRankWeights, parseTags } from './utils/customRank';
+import { listScorecardEvals } from './scorecards/storage';
+import { UNIVERSE_OPTIONS } from './data/screenerIndexLists';
+import { buildUniverseRows, resolveUniverseTickers } from './utils/screenerUniverse';
+import { displayChangePct, displayPrice } from './utils/quoteDisplay';
 
 const PRIORITIES = ['High', 'Medium', 'Low'];
 const RATING_FILTERS = [
@@ -36,42 +40,6 @@ const SORT_OPTIONS = [
 
 const priorityRank = (p) => (p === 'High' ? 0 : p === 'Medium' ? 1 : 2);
 
-function sectorFromWatchlistLabel(sectorText) {
-  const s = (sectorText || '').toLowerCase();
-  if (s.includes('tech') || s.includes('software') || s.includes('saas')) return 'tech';
-  if (s.includes('energy') || s.includes('oil') || s.includes('commod')) return 'energy';
-  if (s.includes('bank') || s.includes('financ') || s.includes('insur')) return 'financial';
-  if (s.includes('health') || s.includes('pharma') || s.includes('biotech')) return 'healthcare';
-  if (s.includes('consumer') || s.includes('staples') || s.includes('retail') || s.includes('industrial')) return 'consumer';
-  return 'core';
-}
-
-function buildRows(watchlist, journalIndex, weights) {
-  return watchlist.map((item) => {
-    const ticker = (item.ticker || '').toUpperCase();
-    const evalRow = getBestEvalForTicker(ticker);
-    const journal = journalIndex.get(ticker);
-    const { score } = computeCustomRank({ watch: item, evalRow, journal, weights });
-    return {
-      id: item.id,
-      ticker,
-      name: item.name || '',
-      sectorLabel: item.sector || '',
-      sectorId: evalRow?.sectorId || sectorFromWatchlistLabel(item.sector),
-      priority: item.priority || 'Medium',
-      notes: item.notes || '',
-      tags: parseTags(item.tags),
-      customRank: score,
-      buyPrice: item.buyPrice,
-      addedDate: item.addedDate,
-      exchange: item.exchange || 'SMART',
-      currency: item.currency || 'USD',
-      eval: evalRow,
-      journal,
-    };
-  });
-}
-
 function filterAndSortRows(rows, filters, quotes) {
   const q = filters.search.trim().toUpperCase();
   const sectorQ = filters.sectorQuery.trim().toLowerCase();
@@ -95,7 +63,7 @@ function filterAndSortRows(rows, filters, quotes) {
     if (filters.journalFilter === 'none' && row.journal) return false;
 
     const quote = quotes[row.ticker];
-    const ch = quote?.changePct;
+    const ch = displayChangePct(quote);
     if (minCh != null && (ch == null || ch < minCh)) return false;
     if (maxCh != null && (ch == null || ch > maxCh)) return false;
     return true;
@@ -113,8 +81,8 @@ function filterAndSortRows(rows, filters, quotes) {
       return (b.customRank ?? -1) - (a.customRank ?? -1);
     }
     if (filters.sortBy === 'change') {
-      const ca = quotes[a.ticker]?.changePct ?? -Infinity;
-      const cb = quotes[b.ticker]?.changePct ?? -Infinity;
+      const ca = displayChangePct(quotes[a.ticker]) ?? -Infinity;
+      const cb = displayChangePct(quotes[b.ticker]) ?? -Infinity;
       return cb - ca;
     }
     const pr = priorityRank(a.priority) - priorityRank(b.priority);
@@ -131,6 +99,7 @@ export default function Screener({
   refreshKey = 0,
   onOpenTerminal,
   onOpenScorecard,
+  onUniverseTickersChange,
 }) {
   const [priorityFilter, setPriorityFilter] = useState(DEFAULT_SCREENER_FILTERS.priorityFilter);
   const [sectorQuery, setSectorQuery] = useState(DEFAULT_SCREENER_FILTERS.sectorQuery);
@@ -143,6 +112,9 @@ export default function Screener({
   const [search, setSearch] = useState(DEFAULT_SCREENER_FILTERS.search);
   const [tagQuery, setTagQuery] = useState(DEFAULT_SCREENER_FILTERS.tagQuery);
   const [minRank, setMinRank] = useState(DEFAULT_SCREENER_FILTERS.minRank);
+  const [universeId, setUniverseId] = useState(DEFAULT_SCREENER_FILTERS.universeId);
+  const [customUniverse, setCustomUniverse] = useState(DEFAULT_SCREENER_FILTERS.customUniverse);
+  const [universeDataTick, setUniverseDataTick] = useState(0);
 
   const [presets, setPresets] = useState(() => listScreenerPresets());
   const [selectedPresetId, setSelectedPresetId] = useState('');
@@ -152,9 +124,37 @@ export default function Screener({
   const [watchlistSnapshot, setWatchlistSnapshot] = useState(() => readJson('watchlist', []));
 
   useEffect(() => {
-    setWatchlistSnapshot(readJson('watchlist', []));
-    setPresets(listScreenerPresets());
+    const reload = () => {
+      setWatchlistSnapshot(readJson('watchlist', []));
+      setPresets(listScreenerPresets());
+    };
+    reload();
   }, [refreshKey]);
+
+  useEffect(() => {
+    const bump = () => setUniverseDataTick((t) => t + 1);
+    window.addEventListener('portfolio-changed', bump);
+    return () => window.removeEventListener('portfolio-changed', bump);
+  }, []);
+
+  const universeTickers = useMemo(
+    () => resolveUniverseTickers(universeId, customUniverse),
+    [universeId, customUniverse, watchlistSnapshot, universeDataTick, refreshKey],
+  );
+
+  useEffect(() => {
+    onUniverseTickersChange?.(universeTickers);
+  }, [universeTickers, onUniverseTickersChange]);
+
+  useEffect(() => {
+    const onWatchlist = () => setWatchlistSnapshot(readJson('watchlist', []));
+    window.addEventListener(WATCHLIST_CHANGED_EVENT, onWatchlist);
+    window.addEventListener(RESEARCH_DATA_IMPORTED_EVENT, onWatchlist);
+    return () => {
+      window.removeEventListener(WATCHLIST_CHANGED_EVENT, onWatchlist);
+      window.removeEventListener(RESEARCH_DATA_IMPORTED_EVENT, onWatchlist);
+    };
+  }, []);
 
   const filters = {
     priorityFilter,
@@ -168,14 +168,15 @@ export default function Screener({
     search,
     tagQuery,
     minRank,
+    universeId,
+    customUniverse,
   };
 
   const evalCount = listScorecardEvals().length;
 
   const rows = useMemo(() => {
     const journalIndex = getJournalIndexByTicker();
-    const weights = getRankWeights();
-    const built = buildRows(watchlistSnapshot, journalIndex, weights);
+    const built = buildUniverseRows(universeTickers, journalIndex);
     return filterAndSortRows(
       built,
       {
@@ -194,7 +195,7 @@ export default function Screener({
       quotes,
     );
   }, [
-    watchlistSnapshot,
+    universeTickers,
     priorityFilter,
     sectorQuery,
     ratingFilter,
@@ -222,6 +223,8 @@ export default function Screener({
     setSearch(next.search ?? '');
     setTagQuery(next.tagQuery ?? '');
     setMinRank(next.minRank ?? '');
+    setUniverseId(next.universeId ?? 'watchlist');
+    setCustomUniverse(next.customUniverse ?? '');
   };
 
   const handleLoadPreset = () => {
@@ -291,12 +294,12 @@ export default function Screener({
           <div style={{ fontSize: 22, fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
             Stock Screener
           </div>
-          <div style={{ fontSize: 13, color: '#64748b', marginTop: 6, maxWidth: 520 }}>
-            Filter your watchlist by priority, scorecard ratings, journal coverage, and live day change when IB is connected.
+          <div style={{ fontSize: 13, color: '#64748b', marginTop: 6, maxWidth: 560 }}>
+            Screen watchlist, saved research, portfolio, index lists, or a custom ticker set — with live IB day change when connected.
           </div>
         </div>
         <div style={{ fontSize: 12, color: '#475569', textAlign: 'right' }}>
-          <div>{watchlistSnapshot.length} watchlist · {evalCount} saved evals</div>
+          <div>{universeTickers.length} in universe · {evalCount} saved evals</div>
           <div style={{ marginTop: 4, color: connection?.status === 'connected' ? '#22c55e' : '#64748b' }}>
             {connection?.status === 'connected' ? 'Live quotes on' : 'Connect IB for % change filters'}
           </div>
@@ -406,6 +409,27 @@ export default function Screener({
           gap: 16,
         }}
       >
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label style={labelStyle}>Universe</label>
+          <select style={inputStyle} value={universeId} onChange={(e) => setUniverseId(e.target.value)}>
+            {UNIVERSE_OPTIONS.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {universeId === 'custom' && (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label style={labelStyle}>Custom tickers (comma or newline)</label>
+            <textarea
+              style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }}
+              placeholder="AAPL, MSFT, NVDA"
+              value={customUniverse}
+              onChange={(e) => setCustomUniverse(e.target.value.toUpperCase())}
+            />
+          </div>
+        )}
         <div>
           <label style={labelStyle}>Search</label>
           <input
@@ -531,7 +555,7 @@ export default function Screener({
         {rows.length} match{rows.length === 1 ? '' : 'es'}
       </div>
 
-      {watchlistSnapshot.length === 0 ? (
+      {universeTickers.length === 0 ? (
         <div
           style={{
             background: '#0a0f1e',
@@ -542,7 +566,22 @@ export default function Screener({
             color: '#475569',
           }}
         >
-          Add symbols to your watchlist, score them on Scorecards (Save to library), then filter here.
+          {universeId === 'watchlist'
+            ? 'Add symbols to your watchlist, or pick another universe (Mag 7, library, custom list, etc.).'
+            : 'This universe has no tickers — add a custom list or choose a different source.'}
+        </div>
+      ) : rows.length === 0 ? (
+        <div
+          style={{
+            background: '#0a0f1e',
+            border: '1px dashed #1a2035',
+            borderRadius: 12,
+            padding: 48,
+            textAlign: 'center',
+            color: '#475569',
+          }}
+        >
+          No names match your filters. Try relaxing rating, journal, or day-change criteria.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -552,7 +591,8 @@ export default function Screener({
             const accent = sectorMeta?.accent || '#6366f1';
             const avg = row.eval?.avg;
             const ratingColor = avg != null ? getRatingColor(avg, accent) : '#334155';
-            const ch = quote?.changePct;
+            const ch = displayChangePct(quote);
+            const px = displayPrice(quote);
             const priColor = row.priority === 'High' ? '#ef4444' : row.priority === 'Medium' ? '#f59e0b' : '#22c55e';
 
             return (
@@ -570,7 +610,12 @@ export default function Screener({
                 }}
               >
                 <div>
-                  <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: 15 }}>{row.ticker}</div>
+                  <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: 15 }}>
+                    {row.ticker}
+                    {!row.onWatchlist && (
+                      <span style={{ marginLeft: 8, fontSize: 10, color: '#64748b', fontWeight: 500 }}>ext</span>
+                    )}
+                  </div>
                   <div style={{ fontSize: 12, color: '#64748b' }}>{row.name || row.sectorLabel || '—'}</div>
                 </div>
                 <div title="Custom rank (Alerts weights)">
@@ -590,7 +635,7 @@ export default function Screener({
                   )}
                 </div>
                 <div style={{ fontSize: 13, color: '#e2e8f0' }}>
-                  {quote?.last != null ? Number(quote.last).toFixed(2) : '—'}
+                  {px != null ? px.toFixed(2) : '—'}
                   {ch != null && (
                     <span style={{ marginLeft: 8, color: ch >= 0 ? '#22c55e' : '#ef4444', fontSize: 12 }}>
                       {ch >= 0 ? '+' : ''}

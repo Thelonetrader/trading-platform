@@ -15,6 +15,10 @@ async function getStore() {
             useTws: false,
             marketDataType: 3,
           },
+          marketData: {
+            fmpApiKey: process.env.FMP_API_KEY || '',
+            cacheTtlMinutes: 60,
+          },
         },
       });
     });

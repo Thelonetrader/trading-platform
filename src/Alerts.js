@@ -7,6 +7,7 @@ import {
   listAlertRules,
   upsertAlertRule,
 } from './utils/alertRules';
+import { displayChangePct, displayPrice } from './utils/quoteDisplay';
 import {
   DEFAULT_RANK_WEIGHTS,
   getRankWeights,
@@ -21,7 +22,7 @@ import {
   saveAlertNotifyState,
 } from './utils/alertNotifications';
 
-export default function Alerts({ onOpenTerminal, onOpenScreener }) {
+export default function Alerts({ quotes = {}, connection, onOpenTerminal, onOpenScreener }) {
   const [weights, setWeights] = useState(() => getRankWeights());
   const [rules, setRules] = useState(() => listAlertRules());
   const [notifyPrefs, setNotifyPrefs] = useState(() => getAlertNotifyPrefs());
@@ -30,8 +31,8 @@ export default function Alerts({ onOpenTerminal, onOpenScreener }) {
   const [msg, setMsg] = useState('');
   const [dataTick, setDataTick] = useState(0);
 
-  const contexts = useMemo(() => rankAllWatchlistItems(), [weights, dataTick]);
-  const evaluations = useMemo(() => evaluateAllRules(contexts), [contexts, rules, dataTick]);
+  const contexts = useMemo(() => rankAllWatchlistItems(quotes), [weights, dataTick, quotes]);
+  const evaluations = useMemo(() => evaluateAllRules(contexts, quotes), [contexts, rules, dataTick, quotes]);
 
   const reload = () => {
     setRules(listAlertRules());
@@ -133,8 +134,8 @@ export default function Alerts({ onOpenTerminal, onOpenScreener }) {
         </div>
         <div style={{ fontSize: 22, fontWeight: 800, color: '#f8fafc' }}>Alerts & ranking</div>
         <div style={{ fontSize: 13, color: '#64748b', marginTop: 6, maxWidth: 560 }}>
-          Custom rank blends scorecard, priority, journal, and notes. Rules fire when watchlist names match your
-          criteria (no market data API required).
+          Custom rank blends scorecard, priority, journal, and notes. With IB connected, rules can also filter on live
+          price, day % change, and distance above watchlist buy price.
         </div>
         {msg && <div style={{ marginTop: 8, fontSize: 13, color: '#22c55e' }}>{msg}</div>}
       </div>
@@ -294,6 +295,64 @@ export default function Alerts({ onOpenTerminal, onOpenScreener }) {
             <label style={{ fontSize: 13, color: '#94a3b8' }}>
               <input type="checkbox" checked={form.requireJournal} onChange={(e) => setForm((f) => ({ ...f, requireJournal: e.target.checked }))} /> Require journal entry
             </label>
+            <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>Live filters (IB quotes; leave blank to ignore)</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <label style={labelStyle}>Min day %</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  style={inputStyle}
+                  value={form.minDayChangePct ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, minDayChangePct: e.target.value === '' ? null : e.target.value }))}
+                  placeholder="e.g. 2"
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Max day %</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  style={inputStyle}
+                  value={form.maxDayChangePct ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, maxDayChangePct: e.target.value === '' ? null : e.target.value }))}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Min price</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  style={inputStyle}
+                  value={form.minPrice ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, minPrice: e.target.value === '' ? null : e.target.value }))}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Max price</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  style={inputStyle}
+                  value={form.maxPrice ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, maxPrice: e.target.value === '' ? null : e.target.value }))}
+                />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Min % above watchlist buy price</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  style={inputStyle}
+                  value={form.minPctAboveBuy ?? ''}
+                  onChange={(e) => setForm((f) => ({ ...f, minPctAboveBuy: e.target.value === '' ? null : e.target.value }))}
+                  placeholder="e.g. 5"
+                />
+              </div>
+            </div>
+            {connection?.status !== 'connected' && (
+              <div style={{ fontSize: 11, color: '#64748b' }}>Connect IB for live price filters to apply.</div>
+            )}
             <div style={{ display: 'flex', gap: 8 }}>
               <button type="button" onClick={submitRule} style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#6366f1', color: '#fff', fontWeight: 600, cursor: 'pointer' }}>
                 {editingId ? 'Update' : 'Add rule'}
@@ -324,6 +383,7 @@ export default function Alerts({ onOpenTerminal, onOpenScreener }) {
                     {rule.tagMatch && `tag "${rule.tagMatch}" · `}
                     {rule.requireScorecard && 'scored · '}
                     {rule.requireJournal && 'journal · '}
+                    {(rule.minDayChangePct != null || rule.maxDayChangePct != null || rule.minPrice != null || rule.maxPrice != null || rule.minPctAboveBuy != null) && 'live · '}
                     priorities {rule.priorities.join(', ')}
                   </div>
                   <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
@@ -355,6 +415,18 @@ export default function Alerts({ onOpenTerminal, onOpenScreener }) {
                     <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{ctx.ticker}</span>
                     <span style={{ marginLeft: 10, fontSize: 12, color: '#818cf8' }}>Rank {ctx.customRank}</span>
                     {ctx.eval && <span style={{ marginLeft: 8, fontSize: 12, color: '#64748b' }}>{ctx.eval.ratingShort}</span>}
+                    {displayPrice(ctx.quote) != null && (
+                      <span style={{ marginLeft: 8, fontSize: 12, color: '#94a3b8' }}>
+                        {displayPrice(ctx.quote).toFixed(2)}
+                        {displayChangePct(ctx.quote) != null && (
+                          <span style={{ color: displayChangePct(ctx.quote) >= 0 ? '#22c55e' : '#ef4444' }}>
+                            {' '}
+                            ({displayChangePct(ctx.quote) >= 0 ? '+' : ''}
+                            {displayChangePct(ctx.quote).toFixed(2)}%)
+                          </span>
+                        )}
+                      </span>
+                    )}
                   </div>
                   {onOpenTerminal && (
                     <button

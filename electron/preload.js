@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('trading', {
   getPositions: () => ipcRenderer.invoke('trading:getPositions'),
   getAccountSummary: () => ipcRenderer.invoke('trading:getAccountSummary'),
   getFundamentals: (entry) => ipcRenderer.invoke('trading:getFundamentals', entry),
+  getHistoricalBars: (entry, options) => ipcRenderer.invoke('trading:getHistoricalBars', entry, options),
   onQuote: (cb) => {
     const handler = (_e, quote) => cb(quote);
     ipcRenderer.on('trading:quote', handler);
@@ -29,4 +30,13 @@ contextBridge.exposeInMainWorld('trading', {
     ipcRenderer.on('trading:order', handler);
     return () => ipcRenderer.removeListener('trading:order', handler);
   },
+});
+
+contextBridge.exposeInMainWorld('marketData', {
+  getConfig: () => ipcRenderer.invoke('marketData:getConfig'),
+  setConfig: (patch) => ipcRenderer.invoke('marketData:setConfig', patch),
+  testFmp: () => ipcRenderer.invoke('marketData:testFmp'),
+  getFundamentals: (entry) => ipcRenderer.invoke('marketData:getFundamentals', entry),
+  getNews: (opts) => ipcRenderer.invoke('marketData:getNews', opts),
+  getEarningsCalendar: (opts) => ipcRenderer.invoke('marketData:getEarningsCalendar', opts),
 });

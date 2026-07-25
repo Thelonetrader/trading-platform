@@ -44,4 +44,6 @@ export const DEFAULT_SCREENER_FILTERS = {
   search: '',
   tagQuery: '',
   minRank: '',
+  universeId: 'watchlist',
+  customUniverse: '',
 };

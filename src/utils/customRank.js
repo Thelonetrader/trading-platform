@@ -1,6 +1,7 @@
 import { getBestEvalForTicker } from '../scorecards/storage';
 import { getJournalIndexByTicker } from './journalIndex';
 import { readJson } from './storageStats';
+import { quoteForSymbol } from './quoteDisplay';
 
 export const RANK_WEIGHTS_KEY = 'rankWeights';
 
@@ -84,7 +85,7 @@ export function buildRankContextForTicker(ticker, watchlist = readJson('watchlis
   };
 }
 
-export function rankAllWatchlistItems() {
+export function rankAllWatchlistItems(quotes = {}) {
   const watchlist = readJson('watchlist', []);
   const journalIndex = getJournalIndexByTicker();
   const weights = getRankWeights();
@@ -102,6 +103,7 @@ export function rankAllWatchlistItems() {
       tags: parseTags(item.tags),
       customRank: score,
       rankBreakdown: breakdown,
+      quote: quoteForSymbol(quotes, ticker),
     };
   });
 }

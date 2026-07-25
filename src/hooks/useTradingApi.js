@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 const noopApi = {
-  getSettings: async () => ({ ib: { mode: 'paper', host: '127.0.0.1', port: 4002, clientId: 1, accountId: '' } }),
-  setSettings: async () => ({}),
+  getSettings: async () => ({
+    ib: { mode: 'paper', host: '127.0.0.1', port: 4002, clientId: 1, accountId: '' },
+    marketData: { fmpApiKey: '', cacheTtlMinutes: 60 },
+  }),
+  setSettings: async (s) => s,
   getConnectionStatus: async () => ({ status: 'disconnected', mode: 'paper' }),
   connect: async () => ({ status: 'disconnected' }),
   disconnect: async () => ({}),
@@ -16,6 +19,7 @@ const noopApi = {
   getPositions: async () => [],
   getAccountSummary: async () => [],
   getFundamentals: async () => ({ metrics: {}, fieldCount: 0, error: 'Connect via Electron' }),
+  getHistoricalBars: async () => ({ bars: [], error: 'Connect via Electron' }),
   onQuote: () => () => {},
   onConnectionStatus: () => () => {},
   onOrderUpdate: () => () => {},
@@ -120,8 +124,12 @@ export function useTradingApi() {
   }, [api]);
 
   const saveSettings = useCallback(
-    async (ib) => {
-      const next = await api.setSettings({ ib });
+    async (payload) => {
+      const body =
+        payload && typeof payload === 'object' && ('ib' in payload || 'marketData' in payload)
+          ? payload
+          : { ib: payload };
+      const next = await api.setSettings(body);
       setSettingsState(next);
       return next;
     },
@@ -149,7 +157,20 @@ export function useTradingApi() {
       if (!entry?.ticker && !entry?.symbol) {
         return { metrics: {}, fieldCount: 0, error: 'Missing ticker' };
       }
+      if (typeof window !== 'undefined' && window.marketData?.getFundamentals) {
+        return window.marketData.getFundamentals(entry);
+      }
       return api.getFundamentals(entry);
+    },
+    [api],
+  );
+
+  const fetchHistoricalBars = useCallback(
+    async (entry, options) => {
+      if (!entry?.ticker && !entry?.symbol) {
+        return { bars: [], error: 'Missing ticker' };
+      }
+      return api.getHistoricalBars(entry, options || {});
     },
     [api],
   );
@@ -171,5 +192,6 @@ export function useTradingApi() {
     refreshTradingData,
     cancelOrder,
     fetchFundamentals,
+    fetchHistoricalBars,
   };
 }
