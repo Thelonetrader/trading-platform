@@ -3,6 +3,7 @@ import Journal from './Journal';
 import Watchlist from './Watchlist';
 import Portfolio from './Portfolio';
 import Scorecards from './Scorecards';
+import ScorecardLibrary from './ScorecardLibrary';
 import Screener from './Screener';
 import CommandBar from './components/CommandBar';
 import QuoteStrip from './components/QuoteStrip';
@@ -17,6 +18,7 @@ import {
   getJournalCount,
   getPortfolioStats,
   getWatchlistSymbols,
+  readJson,
 } from './utils/storageStats';
 
 function App() {
@@ -144,6 +146,7 @@ function App() {
     { id: 'dashboard', label: 'Dashboard', icon: '⬡' },
     { id: 'screener', label: 'Stock Screener', icon: '◈' },
     { id: 'scorecard', label: 'Scorecards', icon: '▣' },
+    { id: 'scorecard-library', label: 'Scorecard Library', icon: '▦' },
     { id: 'portfolio', label: 'Portfolio', icon: '◎' },
     { id: 'watchlist', label: 'Watchlist', icon: '◉' },
     { id: 'journal', label: 'Trade Journal', icon: '✦' },
@@ -159,6 +162,7 @@ function App() {
     'watchlist',
     'portfolio',
     'scorecard',
+    'scorecard-library',
     'screener',
     'settings',
   ]);
@@ -346,7 +350,36 @@ function App() {
           )}
           {activePage === 'portfolio' && <Portfolio connection={connection} />}
           {activePage === 'scorecard' && (
-            <Scorecards focusTicker={scorecardFocus.ticker} focusSector={scorecardFocus.sector} />
+            <Scorecards
+              focusTicker={scorecardFocus.ticker}
+              focusSector={scorecardFocus.sector}
+              onOpenLibrary={() => setActivePage('scorecard-library')}
+            />
+          )}
+          {activePage === 'scorecard-library' && (
+            <ScorecardLibrary
+              onOpenAnalyzer={() => {
+                setScorecardFocus({ ticker: '', sector: '' });
+                setActivePage('scorecard');
+              }}
+              onOpenScorecard={(sym, sector) => {
+                setScorecardFocus({ ticker: sym, sector: sector || 'tech' });
+                setActivePage('scorecard');
+              }}
+              onOpenTerminal={(sym) => {
+                const w = readJson('watchlist', []).find(
+                  (x) => (x.ticker || '').toUpperCase() === sym.toUpperCase(),
+                );
+                setActiveSymbol(sym.toUpperCase());
+                if (w) {
+                  setActiveContract({
+                    exchange: w.exchange || 'SMART',
+                    currency: w.currency || 'USD',
+                  });
+                }
+                setActivePage('terminal');
+              }}
+            />
           )}
           {activePage === 'screener' && (
             <Screener

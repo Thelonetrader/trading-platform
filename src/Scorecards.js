@@ -9,6 +9,7 @@ import {
   getScore,
 } from './scorecards/model';
 import { getScorecardEval, upsertScorecardEval } from './scorecards/storage';
+import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
 
 
 const Pip = ({ filled, color }) => (
@@ -58,7 +59,7 @@ const MetricInput = ({ metric, value, onChange, accent }) => {
   );
 };
 
-export default function Scorecards({ focusTicker = '', focusSector = '' }) {
+export default function Scorecards({ focusTicker = '', focusSector = '', onOpenLibrary }) {
   const [activeSector, setActiveSector] = useState(
     focusSector && SECTORS[focusSector] ? focusSector : 'tech',
   );
@@ -121,6 +122,7 @@ export default function Scorecards({ focusTicker = '', focusSector = '' }) {
       displayName: nameA || ticker,
     });
     setSaveMsg(`Saved ${ticker.toUpperCase()} (${ratingA.short}) for screener`);
+    window.dispatchEvent(new Event(RESEARCH_DATA_IMPORTED_EVENT));
     setTimeout(() => setSaveMsg(''), 3500);
   };
 
@@ -154,6 +156,24 @@ export default function Scorecards({ focusTicker = '', focusSector = '' }) {
           >
             Save to library
           </button>
+          {onOpenLibrary && (
+            <button
+              type="button"
+              onClick={onOpenLibrary}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: 600,
+                border: '1px solid #1a2035',
+                background: '#0a0f1e',
+                color: '#94a3b8',
+              }}
+            >
+              Library
+            </button>
+          )}
           <button onClick={() => setCompareMode(m => !m)} style={{
             padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600,
             border: `1px solid ${compareMode ? "#e879f9" : "#1a2035"}`,
