@@ -396,6 +396,8 @@ function App() {
               onSymbolChange={openTerminalForTicker}
               researchVersion={terminalResearchVersion}
               fetchHistoricalBars={fetchHistoricalBars}
+              fetchFundamentals={fetchFundamentals}
+              hasFmpKey={hasFmpKey}
             />
           )}
           {activePage === 'dashboard' && (

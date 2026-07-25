@@ -55,6 +55,12 @@ npm run dist:dir
 open "dist/mac-arm64/Trading Platform.app"
 ```
 
+Smoke-test the production React bundle inside Electron (no dev server):
+
+```bash
+npm run electron:prod
+```
+
 macOS may block unsigned builds: **System Settings → Privacy & Security → Open Anyway**, or right‑click the app → **Open** once.
 
 Notarization is not configured yet; the app is for personal/local use.
@@ -74,15 +80,25 @@ Notarization is not configured yet; the app is for personal/local use.
 
 Market data requires the appropriate IB market data subscriptions for your symbols.
 
+### FMP (fundamentals, news, earnings)
+
+1. Sign up at [Financial Modeling Prep](https://site.financialmodelingprep.com/) and copy an API key (stable API).
+2. In the app (**Electron only**), open **Settings** → **Market data (Phase 2)** → paste the key → **Save market data** → **Test FMP**.
+3. Optional: set `FMP_API_KEY` in a local `.env` for defaults (see `.env.example`).
+
+Cached responses use the TTL in Settings (default 60 minutes). Restart Electron after changing main-process code.
+
 ## Features
 
-- **Terminal** — symbol workspace, order ticket, quote strip, ⌘K command bar
+- **Terminal** — symbol workspace, **key metrics** (FMP/IB), **IB daily chart** (hover OHLCV), order ticket, quote strip, ⌘K command bar
 - **Watchlist** — local notes + live quotes when IB connected (exchange/currency per symbol)
-- **Stock Screener** — filter watchlist by priority, scorecard ratings, journal, IB day change; saved screen presets
-- **Scorecards** — sector fundamental scorecards; save evaluations to the research library
+- **Stock Screener** — filter watchlist or index universes (Mag 7, Dow, etc.) by priority, scorecard, journal, IB day change, custom rank; saved presets
+- **Scorecards** — sector fundamental scorecards; **auto-fill from FMP and/or IB**; save evaluations to the research library
+- **News & Sentiment** — FMP headlines per watchlist tickers + lexicon sentiment; earnings calendar block
 - **Portfolio** — manual holdings or IB positions tab
+- **Alerts** — local rules (scorecard, priority, tags, **live price / % / buy-price**) with in-app notifications
 - **Journal & Scorecards** — local research workflow
-- **Settings** — IB connection; **export/import** backup (watchlist, journal, portfolio, scorecards, screener presets)
+- **Settings** — IB connection; **FMP key** and cache TTL; **export/import** backup (watchlist, journal, portfolio, scorecards, screener presets, alert rules)
 
 ## Data backup
 

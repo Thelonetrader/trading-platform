@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TerminalChart from './TerminalChart';
+import TerminalKeyMetrics from './TerminalKeyMetrics';
 import OrderTicket from './OrderTicket';
 import OpenOrdersPanel from './OpenOrdersPanel';
 import { RESEARCH_DATA_IMPORTED_EVENT } from '../utils/dataBackup';
@@ -158,6 +159,8 @@ export default function TerminalWorkspace({
   onSymbolChange,
   researchVersion = 0,
   fetchHistoricalBars,
+  fetchFundamentals,
+  hasFmpKey,
 }) {
   const [research, setResearch] = useState(null);
 
@@ -246,6 +249,14 @@ export default function TerminalWorkspace({
             </div>
           ) : (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 280 }}>
+              <TerminalKeyMetrics
+                symbol={symbol}
+                exchange={exchange}
+                currency={currency}
+                fetchFundamentals={fetchFundamentals}
+                hasFmpKey={hasFmpKey}
+                connection={connection}
+              />
               <TerminalChart
                 symbol={symbol}
                 exchange={exchange}
