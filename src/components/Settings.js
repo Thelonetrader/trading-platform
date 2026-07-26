@@ -6,6 +6,7 @@ import {
   readBackupFile,
   summarizeBackup,
 } from '../utils/dataBackup';
+import { THEME_OPTIONS, useTheme } from '../theme/ThemeContext';
 
 const PORT_PRESETS = {
   paper: { gateway: 4002, tws: 7497 },
@@ -52,6 +53,7 @@ export default function Settings({
   const [importMode, setImportMode] = useState('merge');
   const [importBroker, setImportBroker] = useState(true);
   const fileInputRef = useRef(null);
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     if (settings?.ib) {
@@ -279,18 +281,48 @@ export default function Settings({
           }}
         >
           <strong style={{ color: '#818cf8' }}>FMP API key</strong> — scroll to{' '}
-          <strong style={{ color: '#f1f5f9' }}>Market data (Phase 2)</strong> below, paste your key, then click{' '}
-          <strong style={{ color: '#f1f5f9' }}>Save market data</strong> and <strong style={{ color: '#f1f5f9' }}>Test FMP</strong>.
+          <strong style={{ color: 'var(--tp-text-title)' }}>Market data (Phase 2)</strong> below, paste your key, then click{' '}
+          <strong style={{ color: 'var(--tp-text-title)' }}>Save market data</strong> and <strong style={{ color: 'var(--tp-text-title)' }}>Test FMP</strong>.
           Use the Electron app (<code style={{ fontSize: 12 }}>npm run electron:dev</code>), not browser-only{' '}
           <code style={{ fontSize: 12 }}>npm start</code>.
         </div>
       )}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontSize: 11, color: 'var(--tp-text-dim)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+          Appearance
+        </div>
+        <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--tp-text-strong)', marginTop: 4 }}>Theme</div>
+        <p style={{ fontSize: 13, color: 'var(--tp-text-muted)', marginTop: 8, marginBottom: 12, lineHeight: 1.5 }}>
+          Choose light or dark. Your choice is saved on this device.
+        </p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {THEME_OPTIONS.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => setTheme(opt.id)}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 8,
+                border: theme === opt.id ? '1px solid var(--tp-accent-border)' : '1px solid var(--tp-border)',
+                background: theme === opt.id ? 'var(--tp-accent-soft)' : 'var(--tp-bg-panel)',
+                color: theme === opt.id ? 'var(--tp-text-title)' : 'var(--tp-text-secondary)',
+                fontWeight: theme === opt.id ? 600 : 400,
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+        <div style={{ fontSize: 11, color: 'var(--tp-text-dim)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
           Broker connection
         </div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: '#f8fafc' }}>Interactive Brokers</div>
-        <p style={{ fontSize: 13, color: '#64748b', marginTop: 8, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--tp-text-strong)' }}>Interactive Brokers</div>
+        <p style={{ fontSize: 13, color: 'var(--tp-text-muted)', marginTop: 8, lineHeight: 1.5 }}>
           Run IB Gateway or TWS locally with API enabled. Trusted IP: 127.0.0.1. Login happens in Gateway, not here.
         </p>
       </div>
@@ -304,8 +336,8 @@ export default function Settings({
             style={{
               padding: '8px 16px',
               borderRadius: 8,
-              border: form.mode === m ? '1px solid #6366f1' : '1px solid #1a2035',
-              background: form.mode === m ? '#1a2035' : 'transparent',
+              border: form.mode === m ? '1px solid #6366f1' : '1px solid var(--tp-border)',
+              background: form.mode === m ? 'var(--tp-bg-active)' : 'transparent',
               color: form.mode === m ? '#f1f5f9' : '#64748b',
               cursor: 'pointer',
               textTransform: 'capitalize',
@@ -322,7 +354,7 @@ export default function Settings({
         ['clientId', 'Client ID', 'number'],
         ['accountId', 'Account ID (optional)'],
       ].map(([key, label, type]) => (
-        <label key={key} style={{ display: 'block', marginBottom: 12, fontSize: 11, color: '#64748b' }}>
+        <label key={key} style={{ display: 'block', marginBottom: 12, fontSize: 11, color: 'var(--tp-text-muted)' }}>
           {label}
           <input
             type={type || 'text'}
@@ -338,7 +370,7 @@ export default function Settings({
         </label>
       ))}
 
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 13, color: '#94a3b8' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 13, color: 'var(--tp-text-secondary)' }}>
         <input
           type="checkbox"
           checked={form.useTws}
@@ -351,7 +383,7 @@ export default function Settings({
         Use TWS ports instead of Gateway
       </label>
 
-      <label style={{ display: 'block', marginBottom: 16, fontSize: 11, color: '#64748b' }}>
+      <label style={{ display: 'block', marginBottom: 16, fontSize: 11, color: 'var(--tp-text-muted)' }}>
         Market data type (Save while connected re-subscribes quotes)
         <select
           value={form.marketDataType ?? 3}
@@ -362,8 +394,8 @@ export default function Settings({
           <option value={4}>Delayed frozen — when market closed</option>
           <option value={1}>Live — requires IB market data subscription</option>
         </select>
-        <span style={{ display: 'block', marginTop: 6, color: '#475569', lineHeight: 1.45 }}>
-          After switching to Delayed, click <strong style={{ color: '#94a3b8' }}>Save</strong> (or Disconnect →
+        <span style={{ display: 'block', marginTop: 6, color: 'var(--tp-text-faint)', lineHeight: 1.45 }}>
+          After switching to Delayed, click <strong style={{ color: 'var(--tp-text-secondary)' }}>Save</strong> (or Disconnect →
           Connect). Orange “additional subscription” text is for live feeds; delayed quotes may take ~15 minutes
           after the open.
         </span>
@@ -381,34 +413,34 @@ export default function Settings({
         </button>
       </div>
 
-      <div style={{ marginTop: 16, fontSize: 12, color: '#475569' }}>
+      <div style={{ marginTop: 16, fontSize: 12, color: 'var(--tp-text-faint)' }}>
         Status: <strong style={{ color: connection.status === 'connected' ? '#22c55e' : '#94a3b8' }}>{connection.status}</strong>
       </div>
-      {message && <div style={{ marginTop: 12, fontSize: 13, color: '#94a3b8' }}>{message}</div>}
+      {message && <div style={{ marginTop: 12, fontSize: 13, color: 'var(--tp-text-secondary)' }}>{message}</div>}
       {form.mode === 'live' && (
         <div style={{ marginTop: 16, padding: 12, borderRadius: 8, background: '#450a0a', color: '#fecaca', fontSize: 12 }}>
           Live mode sends real orders. Double-check port and account before connecting.
         </div>
       )}
 
-      <div style={{ marginTop: 40, paddingTop: 28, borderTop: '1px solid #1a2035' }}>
-        <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+      <div style={{ marginTop: 40, paddingTop: 28, borderTop: '1px solid var(--tp-border)' }}>
+        <div style={{ fontSize: 11, color: 'var(--tp-text-dim)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
           AI assistant
         </div>
-        <div style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', marginTop: 4 }}>Research agent · provider profiles</div>
-        <p style={{ fontSize: 13, color: '#64748b', marginTop: 8, lineHeight: 1.5 }}>
-          Start free with <strong style={{ color: '#94a3b8' }}>Ollama</strong> (local). Add OpenAI, Groq, or any compatible API
-          when you want stronger models — pay providers directly (BYOK). A future <strong style={{ color: '#94a3b8' }}>Pro</strong>{' '}
+        <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--tp-text-strong)', marginTop: 4 }}>Research agent · provider profiles</div>
+        <p style={{ fontSize: 13, color: 'var(--tp-text-muted)', marginTop: 8, lineHeight: 1.5 }}>
+          Start free with <strong style={{ color: 'var(--tp-text-secondary)' }}>Ollama</strong> (local). Add OpenAI, Groq, or any compatible API
+          when you want stronger models — pay providers directly (BYOK). A future <strong style={{ color: 'var(--tp-text-secondary)' }}>Pro</strong>{' '}
           plan can unlock hosted models without pasting keys.
         </p>
-        <div style={{ marginTop: 12, fontSize: 12, color: '#475569' }}>
+        <div style={{ marginTop: 12, fontSize: 12, color: 'var(--tp-text-faint)' }}>
           App plan:{' '}
-          <strong style={{ color: '#94a3b8' }}>
+          <strong style={{ color: 'var(--tp-text-secondary)' }}>
             {agentConfig?.subscriptionPlans?.find((p) => p.id === agentConfig?.subscription?.plan)?.label ||
               'Free'}
           </strong>
         </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 12, fontSize: 13, color: '#94a3b8' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 12, fontSize: 13, color: 'var(--tp-text-secondary)' }}>
           <input
             type="checkbox"
             checked={agentEnabled !== false}
@@ -417,7 +449,7 @@ export default function Settings({
           Enable AI assistant on Terminal
         </label>
 
-        <label style={{ display: 'block', marginBottom: 8, fontSize: 11, color: '#64748b' }}>
+        <label style={{ display: 'block', marginBottom: 8, fontSize: 11, color: 'var(--tp-text-muted)' }}>
           Active provider profile
           <select
             value={editingProfileId}
@@ -458,12 +490,12 @@ export default function Settings({
         </div>
 
         {agentConfig?.profiles?.find((p) => p.id === editingProfileId)?.description && (
-          <p style={{ fontSize: 12, color: '#475569', marginBottom: 12 }}>
+          <p style={{ fontSize: 12, color: 'var(--tp-text-faint)', marginBottom: 12 }}>
             {agentConfig.profiles.find((p) => p.id === editingProfileId).description}
           </p>
         )}
 
-        <label style={{ display: 'block', marginBottom: 12, fontSize: 11, color: '#64748b' }}>
+        <label style={{ display: 'block', marginBottom: 12, fontSize: 11, color: 'var(--tp-text-muted)' }}>
           Display name
           <input
             value={profileDraft.label || ''}
@@ -471,7 +503,7 @@ export default function Settings({
             style={fieldStyle}
           />
         </label>
-        <label style={{ display: 'block', marginBottom: 12, fontSize: 11, color: '#64748b' }}>
+        <label style={{ display: 'block', marginBottom: 12, fontSize: 11, color: 'var(--tp-text-muted)' }}>
           API base URL (OpenAI-compatible /v1)
           <input
             value={profileDraft.baseUrl || ''}
@@ -480,7 +512,7 @@ export default function Settings({
             style={fieldStyle}
           />
         </label>
-        <label style={{ display: 'block', marginBottom: 12, fontSize: 11, color: '#64748b' }}>
+        <label style={{ display: 'block', marginBottom: 12, fontSize: 11, color: 'var(--tp-text-muted)' }}>
           Model name
           <input
             value={profileDraft.model || ''}
@@ -489,7 +521,7 @@ export default function Settings({
             style={fieldStyle}
           />
         </label>
-        <label style={{ display: 'block', marginBottom: 12, fontSize: 11, color: '#64748b' }}>
+        <label style={{ display: 'block', marginBottom: 12, fontSize: 11, color: 'var(--tp-text-muted)' }}>
           API key (optional for Ollama)
           <input
             type="password"
@@ -504,7 +536,7 @@ export default function Settings({
             style={fieldStyle}
           />
         </label>
-        <label style={{ display: 'block', marginBottom: 16, fontSize: 11, color: '#64748b' }}>
+        <label style={{ display: 'block', marginBottom: 16, fontSize: 11, color: 'var(--tp-text-muted)' }}>
           Max tokens per reply
           <input
             type="number"
@@ -525,16 +557,16 @@ export default function Settings({
         </div>
       </div>
 
-      <div style={{ marginTop: 40, paddingTop: 28, borderTop: '1px solid #1a2035' }}>
-        <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+      <div style={{ marginTop: 40, paddingTop: 28, borderTop: '1px solid var(--tp-border)' }}>
+        <div style={{ fontSize: 11, color: 'var(--tp-text-dim)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
           Market data (Phase 2)
         </div>
-        <div style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', marginTop: 4 }}>Financial Modeling Prep</div>
-        <p style={{ fontSize: 13, color: '#64748b', marginTop: 8, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--tp-text-strong)', marginTop: 4 }}>Financial Modeling Prep</div>
+        <p style={{ fontSize: 13, color: 'var(--tp-text-muted)', marginTop: 8, lineHeight: 1.5 }}>
           Powers scorecard auto-fill (without IB Reuters), News & sentiment, and earnings dates. Key stays in local
           Electron storage — not included in research backup export.
         </p>
-        <label style={{ display: 'block', marginTop: 16, marginBottom: 12, fontSize: 11, color: '#64748b' }}>
+        <label style={{ display: 'block', marginTop: 16, marginBottom: 12, fontSize: 11, color: 'var(--tp-text-muted)' }}>
           FMP API key
           <input
             type="password"
@@ -545,7 +577,7 @@ export default function Settings({
             style={fieldStyle}
           />
         </label>
-        <label style={{ display: 'block', marginBottom: 16, fontSize: 11, color: '#64748b' }}>
+        <label style={{ display: 'block', marginBottom: 16, fontSize: 11, color: 'var(--tp-text-muted)' }}>
           Cache TTL (minutes)
           <input
             type="number"
@@ -566,17 +598,17 @@ export default function Settings({
         </div>
       </div>
 
-      <div style={{ marginTop: 40, paddingTop: 28, borderTop: '1px solid #1a2035' }}>
-        <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+      <div style={{ marginTop: 40, paddingTop: 28, borderTop: '1px solid var(--tp-border)' }}>
+        <div style={{ fontSize: 11, color: 'var(--tp-text-dim)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
           Data backup
         </div>
-        <div style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', marginTop: 4 }}>Export / import</div>
-        <p style={{ fontSize: 13, color: '#64748b', marginTop: 8, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--tp-text-strong)', marginTop: 4 }}>Export / import</div>
+        <p style={{ fontSize: 13, color: 'var(--tp-text-muted)', marginTop: 8, lineHeight: 1.5 }}>
           Save watchlist, journal, portfolio, scorecard library, and screener presets to a JSON file. Import on this
           machine or another install.
         </p>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 12, fontSize: 13, color: '#94a3b8' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 12, fontSize: 13, color: 'var(--tp-text-secondary)' }}>
           <input
             type="checkbox"
             checked={includeBrokerExport}
@@ -590,11 +622,11 @@ export default function Settings({
         </button>
 
         <div style={{ marginTop: 24, marginBottom: 12 }}>
-          <div style={{ fontSize: 11, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: 'var(--tp-text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
             Import
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#94a3b8' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--tp-text-secondary)' }}>
               <input
                 type="radio"
                 name="importMode"
@@ -603,7 +635,7 @@ export default function Settings({
               />
               Merge (keep existing; incoming wins on same id)
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#94a3b8' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--tp-text-secondary)' }}>
               <input
                 type="radio"
                 name="importMode"
@@ -612,7 +644,7 @@ export default function Settings({
               />
               Replace (overwrite local research data)
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#94a3b8' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--tp-text-secondary)' }}>
               <input
                 type="checkbox"
                 checked={importBroker}
@@ -635,10 +667,10 @@ const fieldStyle = {
   display: 'block',
   width: '100%',
   marginTop: 4,
-  background: '#060b16',
-  border: '1px solid #1a2035',
+  background: 'var(--tp-bg-input)',
+  border: '1px solid var(--tp-border)',
   borderRadius: 8,
-  color: '#f1f5f9',
+  color: 'var(--tp-text-title)',
   fontSize: 13,
   padding: '8px 10px',
   boxSizing: 'border-box',
@@ -657,8 +689,8 @@ const btnPrimary = {
 const btnSecondary = {
   padding: '10px 18px',
   background: 'transparent',
-  border: '1px solid #1a2035',
+  border: '1px solid var(--tp-border)',
   borderRadius: 8,
-  color: '#94a3b8',
+  color: 'var(--tp-text-secondary)',
   cursor: 'pointer',
 };

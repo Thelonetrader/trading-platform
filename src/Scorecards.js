@@ -49,7 +49,7 @@ const MetricInput = ({ metric, value, onChange, accent }) => {
           {metric.options.map(opt => (
             <button key={opt.value} onClick={() => onChange(opt.value)} style={{
               padding: "4px 8px", borderRadius: 5, textAlign: "left",
-              border: `1px solid ${value === opt.value ? opt.color : "#1a2035"}`,
+              border: `1px solid ${value === opt.value ? opt.color : 'var(--tp-bg-active)'}`,
               background: value === opt.value ? `${opt.color}18` : "transparent",
               color: value === opt.value ? opt.color : "#334155",
               fontSize: 11, cursor: "pointer", fontWeight: value === opt.value ? 600 : 400,
@@ -240,17 +240,17 @@ export default function Scorecards({
     setTimeout(() => setSaveMsg(''), 3500);
   };
 
-  const inputStyle = { background: "#0a0f1e", border: "1px solid #1a2035", borderRadius: 8, color: "#f8fafc", fontSize: 14, padding: "8px 12px", width: "100%", outline: "none", boxSizing: "border-box", fontWeight: 500 };
+  const inputStyle = { background: 'var(--tp-bg-panel)', border: "1px solid var(--tp-border)", borderRadius: 8, color: "#f8fafc", fontSize: 14, padding: "8px 12px", width: "100%", outline: "none", boxSizing: "border-box", fontWeight: 500 };
 
   return (
     <div>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <div>
-          <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 4 }}>Fundamental Analysis</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>Sector Scorecards</div>
-          <div style={{ fontSize: 12, color: '#64748b', marginTop: 6, maxWidth: 520 }}>
-            Start with <strong style={{ color: '#94a3b8' }}>Core Equity</strong> for broker-style valuation and quality, then use a sector template. Enter figures from your broker or filings (manual until data API).
+          <div style={{ fontSize: 11, color: 'var(--tp-text-dim)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 4 }}>Fundamental Analysis</div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--tp-text-strong)', letterSpacing: '-0.02em' }}>Sector Scorecards</div>
+          <div style={{ fontSize: 12, color: 'var(--tp-text-muted)', marginTop: 6, maxWidth: 520 }}>
+            Start with <strong style={{ color: 'var(--tp-text-secondary)' }}>Core Equity</strong> for broker-style valuation and quality, then use a sector template. Enter figures from your broker or filings (manual until data API).
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -283,9 +283,9 @@ export default function Scorecards({
                 cursor: 'pointer',
                 fontSize: 13,
                 fontWeight: 600,
-                border: '1px solid #1a2035',
-                background: '#0a0f1e',
-                color: '#94a3b8',
+                border: '1px solid var(--tp-border)',
+                background: 'var(--tp-bg-panel)',
+                color: 'var(--tp-text-secondary)',
               }}
             >
               Library
@@ -293,8 +293,8 @@ export default function Scorecards({
           )}
           <button onClick={() => setCompareMode(m => !m)} style={{
             padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600,
-            border: `1px solid ${compareMode ? "#e879f9" : "#1a2035"}`,
-            background: compareMode ? "#e879f915" : "#0a0f1e",
+            border: `1px solid ${compareMode ? "#e879f9" : 'var(--tp-bg-active)'}`,
+            background: compareMode ? "#e879f915" : 'var(--tp-bg-panel)',
             color: compareMode ? "#e879f9" : "#475569",
           }}>
             {compareMode ? "⇄ Exit Compare" : "⇄ Compare Two Stocks"}
@@ -311,8 +311,8 @@ export default function Scorecards({
           return (
             <button key={s.id} onClick={() => setActiveSector(s.id)} style={{
               padding: "9px 14px", borderRadius: 8, cursor: "pointer",
-              border: `1px solid ${isActive ? s.accent : "#1a2035"}`,
-              background: isActive ? `${s.accent}15` : "#0a0f1e",
+              border: `1px solid ${isActive ? s.accent : 'var(--tp-bg-active)'}`,
+              background: isActive ? `${s.accent}15` : 'var(--tp-bg-panel)',
               color: isActive ? s.accent : "#475569",
               fontSize: 13, fontWeight: isActive ? 700 : 400,
               display: "flex", alignItems: "center", gap: 7,
@@ -342,9 +342,9 @@ export default function Scorecards({
             placeholder={compareMode ? "Stock A ticker" : `Ticker (${sector.label})`}
             style={inputStyle} />
           {livePrice != null && !compareMode && (
-            <div style={{ marginTop: 8, fontSize: 13, color: '#94a3b8' }}>
+            <div style={{ marginTop: 8, fontSize: 13, color: 'var(--tp-text-secondary)' }}>
               Live{' '}
-              <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{livePrice.toFixed(2)}</span>
+              <span style={{ fontWeight: 700, color: 'var(--tp-text-title)' }}>{livePrice.toFixed(2)}</span>
               {liveChg != null && (
                 <span style={{ marginLeft: 8, color: liveChg >= 0 ? '#22c55e' : '#ef4444', fontWeight: 600 }}>
                   {liveChg >= 0 ? '+' : ''}
@@ -352,7 +352,7 @@ export default function Scorecards({
                 </span>
               )}
               {connection?.status !== 'connected' && livePrice == null && (
-                <span style={{ marginLeft: 8, color: '#64748b' }}>Connect IB for live price</span>
+                <span style={{ marginLeft: 8, color: 'var(--tp-text-muted)' }}>Connect IB for live price</span>
               )}
             </div>
           )}
@@ -367,7 +367,7 @@ export default function Scorecards({
       </div>
       {!compareMode && isElectron && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 20 }}>
-          <label style={{ fontSize: 12, color: '#94a3b8', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label style={{ fontSize: 12, color: 'var(--tp-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <input type="checkbox" checked={autoFillIb} onChange={(e) => setAutoFillIb(e.target.checked)} />
             Auto-fill fundamentals for new tickers (FMP or IB)
           </label>
@@ -378,8 +378,8 @@ export default function Scorecards({
             style={{
               padding: '6px 12px',
               borderRadius: 6,
-              border: '1px solid #1a2035',
-              background: '#0a0f1e',
+              border: '1px solid var(--tp-border)',
+              background: 'var(--tp-bg-panel)',
               color: connection?.status === 'connected' ? '#818cf8' : '#64748b',
               fontSize: 12,
               fontWeight: 600,
@@ -394,12 +394,12 @@ export default function Scorecards({
             </span>
           )}
           {hasSavedResearch && canFetchFundamentals && (
-            <span style={{ fontSize: 11, color: '#64748b' }}>
+            <span style={{ fontSize: 11, color: 'var(--tp-text-muted)' }}>
               Loaded from research library — use Refresh to replace with live ratios
             </span>
           )}
           {!canFetchFundamentals && (
-            <span style={{ fontSize: 11, color: '#64748b' }}>Add FMP key in Settings and/or connect IB for quotes</span>
+            <span style={{ fontSize: 11, color: 'var(--tp-text-muted)' }}>Add FMP key in Settings and/or connect IB for quotes</span>
           )}
         </div>
       )}
@@ -411,7 +411,7 @@ export default function Scorecards({
           const scoreB = getScore(metric, valuesB[metric.id]);
           const metricWinner = compareMode ? scoreA > scoreB ? "A" : scoreB > scoreA ? "B" : null : null;
           return (
-            <div key={metric.id} style={{ background: "#0a0f1e", border: "1px solid #1a2035", borderRadius: 10, padding: "14px 16px" }}>
+            <div key={metric.id} style={{ background: 'var(--tp-bg-panel)', border: "1px solid var(--tp-border)", borderRadius: 10, padding: "14px 16px" }}>
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: "#f1f5f9" }}>{metric.label}</div>
                 <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{metric.description}</div>
@@ -420,7 +420,7 @@ export default function Scorecards({
               <div style={{ display: "grid", gridTemplateColumns: compareMode ? "1fr 1fr" : "1fr", gap: 16 }}>
                 <MetricInput metric={metric} value={valuesA[metric.id]} onChange={val => setValueA(metric.id, val)} accent={sector.accent} />
                 {compareMode && (
-                  <div style={{ borderLeft: "1px solid #1a2035", paddingLeft: 16 }}>
+                  <div style={{ borderLeft: "1px solid var(--tp-border)", paddingLeft: 16 }}>
                     <MetricInput metric={metric} value={valuesB[metric.id]} onChange={val => setValueB(metric.id, val)} accent="#e879f9" />
                   </div>
                 )}
@@ -445,14 +445,14 @@ export default function Scorecards({
                 <div style={{ fontSize: 10, color: "#475569", textTransform: "uppercase", letterSpacing: "0.12em", marginBottom: 4 }}>{s.name}</div>
                 <div style={{ fontSize: 36, fontWeight: 800, color: s.color, letterSpacing: "-0.03em", lineHeight: 1 }}>{s.rating.label}</div>
                 <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>Score: <span style={{ color: s.color, fontWeight: 700 }}>{s.avg.toFixed(2)} / 5.00</span></div>
-                <div style={{ marginTop: 14, height: 5, background: "#1a2035", borderRadius: 3, overflow: "hidden" }}>
+                <div style={{ marginTop: 14, height: 5, background: 'var(--tp-bg-active)', borderRadius: 3, overflow: "hidden" }}>
                   <div style={{ height: "100%", width: `${(s.avg / 5) * 100}%`, background: `linear-gradient(90deg, ${s.accent}40, ${s.color})`, borderRadius: 3 }} />
                 </div>
               </div>
             ))}
           </div>
           <div style={{
-            background: winner === "tie" ? "#1a2035" : winner === "a" ? `${sector.accent}12` : "#e879f912",
+            background: winner === "tie" ? 'var(--tp-bg-active)' : winner === "a" ? `${sector.accent}12` : "#e879f912",
             border: `1px solid ${winner === "tie" ? "#334155" : winner === "a" ? sector.accent + "40" : "#e879f940"}`,
             borderRadius: 12, padding: "18px 20px", textAlign: "center",
           }}>
@@ -497,7 +497,7 @@ export default function Scorecards({
             </div>
           </div>
           <div style={{ marginTop: 20 }}>
-            <div style={{ height: 5, background: "#1a2035", borderRadius: 3, overflow: "hidden" }}>
+            <div style={{ height: 5, background: 'var(--tp-bg-active)', borderRadius: 3, overflow: "hidden" }}>
               <div style={{ height: "100%", width: `${(avgA / 5) * 100}%`, background: `linear-gradient(90deg, ${sector.accentDim}, ${colorA})`, borderRadius: 3, transition: "width 0.4s" }} />
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#334155", marginTop: 4 }}>

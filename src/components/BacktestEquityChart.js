@@ -73,7 +73,7 @@ export default function BacktestEquityChart({
 
   if (!equityCurve.length) {
     return (
-      <div style={{ fontSize: 12, color: '#64748b', padding: 16 }}>
+      <div style={{ fontSize: 12, color: 'var(--tp-text-muted)', padding: 16 }}>
         No equity curve — run backtest with enough bars and trades.
       </div>
     );
@@ -94,17 +94,17 @@ export default function BacktestEquityChart({
           gap: 8,
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#f8fafc' }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--tp-text-strong)' }}>
           {symbol ? `${symbol} · ` : ''}Equity curve
         </span>
-        <span style={{ fontSize: 11, color: '#64748b' }}>
-          <span style={{ color: '#2dd4bf' }}>● Strategy</span>
+        <span style={{ fontSize: 11, color: 'var(--tp-text-muted)' }}>
+          <span style={{ color: 'var(--tp-chart-strategy-line)' }}>● Strategy</span>
           {' · '}
-          <span style={{ color: '#94a3b8' }}>● Buy &amp; hold</span>
+          <span style={{ color: 'var(--tp-text-secondary)' }}>● Buy &amp; hold</span>
           {walkForwardCurve.length > 0 && (
             <>
               {' · '}
-              <span style={{ color: '#a78bfa' }}>● Walk-forward OOS</span>
+              <span style={{ color: 'var(--tp-chart-wf-line)' }}>● Walk-forward OOS</span>
             </>
           )}
         </span>
@@ -113,23 +113,23 @@ export default function BacktestEquityChart({
         viewBox={`0 0 ${w} ${height}`}
         width="100%"
         height={height}
-        style={{ display: 'block', background: '#060b16', borderRadius: 8 }}
+        style={{ display: 'block', background: 'var(--tp-chart-plot-bg)', borderRadius: 8, border: '1px solid var(--tp-border)' }}
         preserveAspectRatio="none"
       >
-        <line x1="0" y1={h} x2={w} y2={h} stroke="#1a2035" strokeWidth="1" />
+        <line x1="0" y1={h} x2={w} y2={h} stroke='var(--tp-bg-active)' strokeWidth="1" />
         {benchPath && (
-          <path d={benchPath} fill="none" stroke="#475569" strokeWidth="1.5" opacity="0.85" />
+          <path d={benchPath} fill="none" stroke="var(--tp-chart-bench-line)" strokeWidth="1.5" opacity="0.85" />
         )}
         {wfPath && (
-          <path d={wfPath} fill="none" stroke="#a78bfa" strokeWidth="2" strokeDasharray="4 3" />
+          <path d={wfPath} fill="none" stroke="var(--tp-chart-wf-line)" strokeWidth="2" strokeDasharray="4 3" />
         )}
         {strategyPath && (
-          <path d={strategyPath} fill="none" stroke="#2dd4bf" strokeWidth="2" />
+          <path d={strategyPath} fill="none" stroke="var(--tp-chart-strategy-line)" strokeWidth="2" />
         )}
-        <text x="8" y="14" fill="#64748b" fontSize="10" fontFamily="ui-monospace, monospace">
+        <text x="8" y="14" fill="var(--tp-chart-axis-muted)" fontSize="10" fontFamily="ui-monospace, monospace">
           {maxY.toFixed(0)}
         </text>
-        <text x="8" y={h - 4} fill="#64748b" fontSize="10" fontFamily="ui-monospace, monospace">
+        <text x="8" y={h - 4} fill="var(--tp-chart-axis-muted)" fontSize="10" fontFamily="ui-monospace, monospace">
           {minY.toFixed(0)}
         </text>
       </svg>
@@ -142,10 +142,10 @@ export default function BacktestEquityChart({
           fontFamily: 'ui-monospace, monospace',
         }}
       >
-        <span style={{ color: '#2dd4bf' }}>Final strategy ${finalStr?.toFixed?.(0) ?? finalStr}</span>
-        <span style={{ color: '#94a3b8' }}>Final B&amp;H ${finalBh?.toFixed?.(0) ?? finalBh}</span>
+        <span style={{ color: 'var(--tp-chart-strategy-line)' }}>Final strategy ${finalStr?.toFixed?.(0) ?? finalStr}</span>
+        <span style={{ color: 'var(--tp-text-secondary)' }}>Final B&amp;H ${finalBh?.toFixed?.(0) ?? finalBh}</span>
         {finalWf != null && walkForwardCurve.length > 0 && (
-          <span style={{ color: '#a78bfa' }}>WF OOS ${finalWf?.toFixed?.(0) ?? finalWf}</span>
+          <span style={{ color: 'var(--tp-chart-wf-line)' }}>WF OOS ${finalWf?.toFixed?.(0) ?? finalWf}</span>
         )}
       </div>
     </div>

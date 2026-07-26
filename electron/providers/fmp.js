@@ -114,6 +114,8 @@ class FmpClient {
               price: profile.price,
               beta: profile.beta,
               exchange: profile.exchangeShortName || profile.exchange || null,
+              currency: profile.currency || null,
+              country: profile.country || null,
             }
           : null,
         error: fieldCount ? null : 'No ratio fields returned for this symbol',
@@ -191,7 +193,7 @@ class FmpClient {
   async getScreenerSnapshots(symbols) {
     const list = [
       ...new Set((symbols || []).map((s) => this.normalizeSymbol(s)).filter(Boolean)),
-    ].slice(0, 80);
+    ].slice(0, 150);
 
     if (!list.length) {
       return { snapshots: {}, count: 0, error: null };
@@ -222,6 +224,8 @@ class FmpClient {
               price: p.price,
               beta: p.beta,
               exchange: p.exchangeShortName || p.exchange || null,
+              currency: p.currency || null,
+              country: p.country || null,
             },
             metrics: {},
             updatedAt: Date.now(),
@@ -262,6 +266,76 @@ class FmpClient {
     await Promise.all(workers);
 
     return { snapshots, count: Object.keys(snapshots).length, error: null };
+  }
+
+  async companyScreener(params = {}) {
+    if (!this._key()) {
+      return { items: [], count: 0, error: 'Add FMP API key in Settings → Market data' };
+    }
+    try {
+      const query = { ...(params || {}) };
+      if (query.limit == null) query.limit = '200';
+      const rows = this._asArray(await this._fetchJson('/company-screener', query));
+      const items = [];
+      const seen = new Set();
+      for (const row of rows) {
+        const symbol = (row.symbol || '').toUpperCase().trim();
+        if (!symbol || seen.has(symbol)) continue;
+        seen.add(symbol);
+        items.push({
+          symbol,
+          name: row.companyName || row.name || '',
+          exchange: row.exchangeShortName || row.exchange || '',
+          country: row.country || '',
+          marketCap: row.marketCap,
+          price: row.price,
+          volume: row.volume,
+          sector: row.sector || '',
+          industry: row.industry || '',
+        });
+      }
+      return { items, count: items.length, error: null };
+    } catch (e) {
+      return { items: [], count: 0, error: e.message || 'Company screener failed' };
+    }
+  }
+
+  async searchSymbols(query, { limit = 20 } = {}) {
+    const q = String(query || '').trim();
+    if (q.length < 2) {
+      return { items: [], error: null };
+    }
+    if (!this._key()) {
+      return { items: [], error: 'Add FMP API key in Settings → Market data' };
+    }
+
+    const cap = Math.min(Math.max(limit, 5), 40);
+    const seen = new Set();
+    const items = [];
+
+    const pushRow = (row) => {
+      const symbol = (row.symbol || row.ticker || '').toUpperCase().trim();
+      if (!symbol || seen.has(symbol)) return;
+      seen.add(symbol);
+      items.push({
+        symbol,
+        name: row.name || row.companyName || '',
+        exchange: row.exchange || row.exchangeShortName || row.stockExchange || '',
+        currency: row.currency || '',
+      });
+    };
+
+    try {
+      const [bySymbol, byName] = await Promise.all([
+        this._fetchJson('/search-symbol', { query: q, limit: String(cap) }).catch(() => []),
+        this._fetchJson('/search-name', { query: q, limit: String(cap) }).catch(() => []),
+      ]);
+      for (const row of this._asArray(bySymbol)) pushRow(row);
+      for (const row of this._asArray(byName)) pushRow(row);
+      return { items: items.slice(0, cap), error: null };
+    } catch (e) {
+      return { items: [], error: e.message || 'Symbol search failed' };
+    }
   }
 
   async getEarningsCalendar({ from, to } = {}) {

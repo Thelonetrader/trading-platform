@@ -1,17 +1,26 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { UNIVERSE_OPTIONS } from './data/screenerIndexLists';
 import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
 import { WATCHLIST_CHANGED_EVENT } from './utils/liveSubscribe';
 import { readJson } from './utils/storageStats';
 import { getJournalIndexByTicker } from './utils/journalIndex';
 import { buildUniverseRows, resolveUniverseTickers } from './utils/screenerUniverse';
 import { displayChangePct, displayPrice } from './utils/quoteDisplay';
+import { fmtMktCap, marketCapFromSnapshots } from './utils/screenerFilters';
 import {
-  SCAN_STRATEGIES,
+  applyScanFilters,
   filterSignals,
   runChartScan,
   sortScanResults,
 } from './utils/chartScannerEngine';
+import {
+  loadScannerPrefs,
+  resolveScanBarOption,
+  resolveScanRunLimits,
+  saveScannerPrefs,
+  formatScanEstimate,
+} from './utils/chartScannerConfig';
+import { useLiveUniverseTickers } from './hooks/useLiveUniverse';
+import ChartScannerSetup from './components/ChartScannerSetup';
 import { runChartBacktest } from './utils/chartBacktest';
 import {
   loadBacktestPrefs,
@@ -27,17 +36,6 @@ import {
   downloadWalkForwardFoldsCsv,
 } from './utils/chartScannerExport';
 
-const BAR_OPTIONS = [
-  { id: '1 day', duration: '1 Y', label: 'Daily (1Y history)', maxSymbols: 30 },
-  { id: '1 hour', duration: '3 M', label: '1 hour (3M history)', maxSymbols: 18 },
-];
-
-const SIGNAL_FILTERS = [
-  { id: 'action', label: 'Buy & sell only' },
-  { id: 'all', label: 'All signals' },
-  { id: 'buy', label: 'Buy only' },
-  { id: 'sell', label: 'Sell only' },
-];
 
 function signalColor(sig) {
   if (sig === 'BUY') return '#22c55e';
@@ -49,16 +47,15 @@ export default function ChartScanner({
   quotes = {},
   connection,
   fetchHistoricalBars,
+  fetchScreenerSnapshots,
+  hasFmpKey = false,
   isElectron,
   onOpenTerminal,
   onUniverseEntriesChange,
+  searchSymbols,
+  fetchCompanyScreener,
 }) {
-  const [universeId, setUniverseId] = useState('watchlist');
-  const [customUniverse, setCustomUniverse] = useState('');
-  const [strategyId, setStrategyId] = useState('multi_confirm');
-  const [barOptionId, setBarOptionId] = useState('1 day');
-  const [signalFilter, setSignalFilter] = useState('action');
-  const [sortBy, setSortBy] = useState('strength');
+  const [scannerPrefs, setScannerPrefs] = useState(() => loadScannerPrefs());
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(null);
   const [results, setResults] = useState([]);
@@ -75,6 +72,9 @@ export default function ChartScanner({
   const [backtestPrefs, setBacktestPrefs] = useState(() => loadBacktestPrefs());
   const [selectedBacktestSymbol, setSelectedBacktestSymbol] = useState(null);
   const [backtestMeta, setBacktestMeta] = useState('');
+  const [fundSnapshots, setFundSnapshots] = useState({});
+  const [snapLoading, setSnapLoading] = useState(false);
+  const [snapError, setSnapError] = useState('');
 
   useEffect(() => {
     const reload = () => setWatchlistSnapshot(readJson('watchlist', []));
@@ -86,35 +86,137 @@ export default function ChartScanner({
     };
   }, []);
 
-  const universeTickers = useMemo(
-    () => resolveUniverseTickers(universeId, customUniverse),
-    [universeId, customUniverse, watchlistSnapshot],
+  useEffect(() => {
+    saveScannerPrefs(scannerPrefs);
+  }, [scannerPrefs]);
+
+  const symbolPickTickers = useMemo(
+    () => (scannerPrefs.symbolPicks || []).map((p) => p.ticker).filter(Boolean),
+    [scannerPrefs.symbolPicks],
   );
+
+  const liveUniverse = useLiveUniverseTickers({
+    universeId: scannerPrefs.universeId,
+    liveUniverse: scannerPrefs.liveUniverse,
+    symbolPickTickers,
+    fetchCompanyScreener,
+    hasFmpKey,
+  });
+
+  const universeTickers = useMemo(() => {
+    if (scannerPrefs.universeId === 'live') {
+      return liveUniverse.mergedTickers || [];
+    }
+    return resolveUniverseTickers(
+      scannerPrefs.universeId,
+      scannerPrefs.customUniverse,
+      symbolPickTickers,
+    );
+  }, [
+    scannerPrefs.universeId,
+    scannerPrefs.customUniverse,
+    symbolPickTickers,
+    liveUniverse.mergedTickers,
+    watchlistSnapshot,
+  ]);
+
+  const nameByTicker = useMemo(() => {
+    if (scannerPrefs.universeId === 'live') {
+      return liveUniverse.nameByTicker || {};
+    }
+    const map = {};
+    for (const p of scannerPrefs.symbolPicks || []) {
+      if (p.ticker && p.name) map[p.ticker.toUpperCase()] = p.name;
+    }
+    return map;
+  }, [scannerPrefs.universeId, scannerPrefs.symbolPicks, liveUniverse.nameByTicker]);
 
   const universeEntries = useMemo(() => {
     const journalIndex = getJournalIndexByTicker();
-    return buildUniverseRows(universeTickers, journalIndex).map((r) => ({
+    return buildUniverseRows(universeTickers, journalIndex, undefined, nameByTicker).map((r) => ({
       ticker: r.ticker,
       exchange: r.exchange,
       currency: r.currency,
     }));
-  }, [universeTickers]);
+  }, [universeTickers, nameByTicker]);
 
   useEffect(() => {
     onUniverseEntriesChange?.(universeEntries);
   }, [universeEntries, onUniverseEntriesChange]);
 
-  const barOpt = BAR_OPTIONS.find((b) => b.id === barOptionId) || BAR_OPTIONS[0];
+  const loadFundSnapshots = useCallback(async () => {
+    if (!fetchScreenerSnapshots || !universeTickers.length) {
+      setFundSnapshots({});
+      return;
+    }
+    if (!hasFmpKey) {
+      setSnapError('');
+      return;
+    }
+    setSnapLoading(true);
+    setSnapError('');
+    try {
+      const res = await fetchScreenerSnapshots(universeTickers);
+      if (res?.error) setSnapError(res.error);
+      setFundSnapshots(res?.snapshots || {});
+    } catch (e) {
+      setSnapError(e.message || 'Fundamentals load failed');
+    } finally {
+      setSnapLoading(false);
+    }
+  }, [fetchScreenerSnapshots, hasFmpKey, universeTickers]);
+
+  useEffect(() => {
+    loadFundSnapshots();
+  }, [loadFundSnapshots]);
+
+  const needsMktCap =
+    scannerPrefs.filters?.minMktCapM ||
+    scannerPrefs.filters?.maxMktCapM ||
+    scannerPrefs.sortBy === 'marketCap' ||
+    scannerPrefs.columns?.marketCap;
+
+  const barOpt = resolveScanBarOption(scannerPrefs.barKey);
+  const scanLimits = useMemo(
+    () =>
+      resolveScanRunLimits({
+        barOpt,
+        scanSize: scannerPrefs.scanSize || 'auto',
+        universeCount: universeEntries.length,
+      }),
+    [barOpt, scannerPrefs.scanSize, universeEntries.length],
+  );
+
   const backtestBarOpt = resolveBacktestBarOption(backtestPrefs.backtestDurationKey);
+  const backtestLimits = useMemo(
+    () =>
+      resolveScanRunLimits({
+        barOpt: {
+          maxSymbols: backtestBarOpt.maxSymbols,
+          pacingMs: 450,
+        },
+        scanSize: scannerPrefs.scanSize || 'auto',
+        universeCount: universeEntries.length,
+      }),
+    [backtestBarOpt.maxSymbols, scannerPrefs.scanSize, universeEntries.length],
+  );
   const engineOptions = useMemo(
     () => prefsToEngineOptions(backtestPrefs),
     [backtestPrefs],
   );
 
   const displayed = useMemo(() => {
-    const filtered = filterSignals(results, signalFilter);
-    return sortScanResults(filtered, sortBy);
-  }, [results, signalFilter, sortBy]);
+    const sig = filterSignals(results, scannerPrefs.signalFilter);
+    const filtered = applyScanFilters(sig, scannerPrefs.filters, quotes, fundSnapshots);
+    return sortScanResults(filtered, scannerPrefs.sortBy, fundSnapshots);
+  }, [
+    results,
+    scannerPrefs.signalFilter,
+    scannerPrefs.filters,
+    scannerPrefs.sortBy,
+    quotes,
+    fundSnapshots,
+  ]);
 
   const runScan = useCallback(async () => {
     if (!isElectron || !fetchHistoricalBars) {
@@ -126,29 +228,38 @@ export default function ChartScanner({
       return;
     }
     if (!universeEntries.length) {
-      setScanError('Choose a universe with at least one symbol.');
+      setScanError(
+        scannerPrefs.universeId === 'live'
+          ? liveUniverse.error || 'Live universe is empty — adjust filters and refresh, or add symbols.'
+          : 'Choose a universe with at least one symbol.',
+      );
+      return;
+    }
+    if (scannerPrefs.universeId === 'live' && liveUniverse.loading) {
+      setScanError('Live universe still loading — wait for refresh to finish.');
       return;
     }
 
     setScanning(true);
     setScanError('');
     setResults([]);
-    setProgress({ idx: 0, total: universeEntries.length, symbol: '…' });
+    setProgress({ idx: 0, total: scanLimits.maxSymbols, symbol: '…' });
 
     try {
       const out = await runChartScan({
         entries: universeEntries,
-        strategyId,
-        barSize: barOpt.id,
+        strategyId: scannerPrefs.strategyId,
+        barSize: barOpt.barSize,
         duration: barOpt.duration,
         fetchHistoricalBars,
         quotes,
-        maxSymbols: barOpt.maxSymbols,
-        pacingMs: 450,
+        maxSymbols: scanLimits.maxSymbols,
+        pacingMs: scanLimits.pacingMs,
         onProgress: setProgress,
       });
       setResults(out);
       setLastScanAt(Date.now());
+      loadFundSnapshots();
     } catch (e) {
       setScanError(e.message || 'Scan failed');
     } finally {
@@ -156,15 +267,20 @@ export default function ChartScanner({
       setProgress(null);
     }
   }, [
+    barOpt.barSize,
     barOpt.duration,
-    barOpt.id,
-    barOpt.maxSymbols,
+    scanLimits.maxSymbols,
+    scanLimits.pacingMs,
     connection?.status,
     fetchHistoricalBars,
     isElectron,
     quotes,
-    strategyId,
+    scannerPrefs.strategyId,
     universeEntries,
+    loadFundSnapshots,
+    liveUniverse.loading,
+    liveUniverse.error,
+    scannerPrefs.universeId,
   ]);
 
   const runBacktest = useCallback(async () => {
@@ -188,17 +304,17 @@ export default function ChartScanner({
     setBacktestAggregate(null);
     setBacktestMeta('');
     setSelectedBacktestSymbol(null);
-    setBacktestProgress({ idx: 0, total: universeEntries.length, symbol: '…' });
+    setBacktestProgress({ idx: 0, total: backtestLimits.maxSymbols, symbol: '…' });
 
     try {
       const out = await runChartBacktest({
         entries: universeEntries,
-        strategyId,
+        strategyId: scannerPrefs.strategyId,
         barSize: backtestBarOpt.id,
         duration: backtestBarOpt.duration,
         fetchHistoricalBars,
-        maxSymbols: backtestBarOpt.maxSymbols,
-        pacingMs: 450,
+        maxSymbols: backtestLimits.maxSymbols,
+        pacingMs: backtestLimits.pacingMs,
         engineOptions,
         onProgress: setBacktestProgress,
       });
@@ -230,13 +346,14 @@ export default function ChartScanner({
     backtestBarOpt.duration,
     backtestBarOpt.id,
     backtestBarOpt.label,
-    backtestBarOpt.maxSymbols,
+    backtestLimits.maxSymbols,
+    backtestLimits.pacingMs,
     backtestPrefs.fillModel,
     connection?.status,
     engineOptions,
     fetchHistoricalBars,
     isElectron,
-    strategyId,
+    scannerPrefs.strategyId,
     universeEntries,
   ]);
 
@@ -244,16 +361,16 @@ export default function ChartScanner({
     if (!results.length) return;
     downloadScanResultsCsv(results, {
       quotes,
-      strategyId,
-      barSize: barOpt.id,
+      strategyId: scannerPrefs.strategyId,
+      barSize: barOpt.barSize,
       scannedAt: lastScanAt,
     });
-  }, [barOpt.id, lastScanAt, quotes, results, strategyId]);
+  }, [barOpt.barSize, lastScanAt, quotes, results, scannerPrefs.strategyId]);
 
   const exportBacktestCsv = useCallback(() => {
     if (!backtestSummaries.length) return;
     downloadBacktestSummaryCsv(backtestSummaries, {
-      strategyId,
+      strategyId: scannerPrefs.strategyId,
       barSize: backtestBarOpt.id,
       duration: backtestBarOpt.duration,
       fillModel: engineOptions.fillModel,
@@ -285,14 +402,14 @@ export default function ChartScanner({
     backtestBarOpt.duration,
     backtestBarOpt.id,
     engineOptions,
-    strategyId,
+    scannerPrefs,
   ]);
 
   const inputStyle = {
-    background: '#060b16',
-    border: '1px solid #1a2035',
+    background: 'var(--tp-bg-input)',
+    border: '1px solid var(--tp-border)',
     borderRadius: 8,
-    color: '#f1f5f9',
+    color: 'var(--tp-text-title)',
     fontSize: 13,
     padding: '8px 12px',
     width: '100%',
@@ -302,7 +419,7 @@ export default function ChartScanner({
 
   const labelStyle = {
     fontSize: 11,
-    color: '#475569',
+    color: 'var(--tp-text-faint)',
     textTransform: 'uppercase',
     letterSpacing: '0.1em',
     marginBottom: 6,
@@ -311,16 +428,33 @@ export default function ChartScanner({
 
   const livePriced = universeTickers.filter((t) => displayPrice(quotes[t]) != null).length;
 
+  const cols = scannerPrefs.columns || {};
+  const tableHeaders = useMemo(() => {
+    const h = ['Symbol', 'Signal', 'Str', 'Last', 'Chg%'];
+    if (cols.change5) h.push('5b%');
+    if (cols.pctSma50) h.push('vs SMA50');
+    h.push('RSI');
+    if (cols.emaTrend) h.push('EMA9/21');
+    h.push('SMA20/50', 'MACD hist');
+    if (cols.volRatio) h.push('Vol×');
+    if (cols.marketCap) h.push('Mkt cap');
+    if (cols.atrPct) h.push('ATR%');
+    if (cols.bbWidth) h.push('BB width');
+    h.push('Reasons', '');
+    return h;
+  }, [cols.atrPct, cols.bbWidth, cols.change5, cols.emaTrend, cols.marketCap, cols.pctSma50, cols.volRatio]);
+
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
+        <div style={{ fontSize: 11, color: 'var(--tp-text-dim)', textTransform: 'uppercase', letterSpacing: '0.15em' }}>
           Technical scan
         </div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: '#f8fafc' }}>Chart Scanner</div>
-        <p style={{ fontSize: 13, color: '#64748b', marginTop: 8, maxWidth: 680, lineHeight: 1.55 }}>
-          Runs indicator rules on IB historical bars and blends in <strong style={{ color: '#94a3b8' }}>live</strong>{' '}
-          last/bid/ask when subscribed. Outputs research signals — not auto-trading or financial advice.
+        <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--tp-text-strong)' }}>Chart Scanner Pro</div>
+        <p style={{ fontSize: 13, color: 'var(--tp-text-muted)', marginTop: 8, maxWidth: 720, lineHeight: 1.55 }}>
+          Presets, multi-timeframe strategies, and post-scan filters on IB historical bars plus{' '}
+          <strong style={{ color: 'var(--tp-text-secondary)' }}>live</strong> quotes when this page is open. Research only — not
+          financial advice.
         </p>
       </div>
 
@@ -340,80 +474,19 @@ export default function ChartScanner({
         guarantee future results.
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: 14,
-          background: '#0a0f1e',
-          border: '1px solid #1a2035',
-          borderRadius: 12,
-          padding: 18,
-          marginBottom: 16,
-        }}
-      >
-        <div style={{ gridColumn: '1 / -1' }}>
-          <label style={labelStyle}>Universe ({universeTickers.length} symbols, max {barOpt.maxSymbols} scanned)</label>
-          <select style={inputStyle} value={universeId} onChange={(e) => setUniverseId(e.target.value)}>
-            {UNIVERSE_OPTIONS.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        {universeId === 'custom' && (
-          <div style={{ gridColumn: '1 / -1' }}>
-            <textarea
-              style={{ ...inputStyle, minHeight: 64 }}
-              placeholder="AAPL, MSFT, …"
-              value={customUniverse}
-              onChange={(e) => setCustomUniverse(e.target.value.toUpperCase())}
-            />
-          </div>
-        )}
-        <div>
-          <label style={labelStyle}>Strategy</label>
-          <select style={inputStyle} value={strategyId} onChange={(e) => setStrategyId(e.target.value)}>
-            {SCAN_STRATEGIES.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label style={labelStyle}>Bar size</label>
-          <select style={inputStyle} value={barOptionId} onChange={(e) => setBarOptionId(e.target.value)}>
-            {BAR_OPTIONS.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label style={labelStyle}>Show</label>
-          <select style={inputStyle} value={signalFilter} onChange={(e) => setSignalFilter(e.target.value)}>
-            {SIGNAL_FILTERS.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label style={labelStyle}>Sort</label>
-          <select style={inputStyle} value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-            <option value="strength">Strength</option>
-            <option value="symbol">Symbol</option>
-          </select>
-        </div>
-      </div>
-
-      <p style={{ fontSize: 12, color: '#475569', margin: '-8px 0 12px' }}>
-        {SCAN_STRATEGIES.find((s) => s.id === strategyId)?.description}
-      </p>
+      <ChartScannerSetup
+        prefs={scannerPrefs}
+        onPrefsChange={setScannerPrefs}
+        universeCount={universeTickers.length}
+        scanLimits={scanLimits}
+        barOpt={barOpt}
+        inputStyle={inputStyle}
+        labelStyle={labelStyle}
+        searchSymbols={searchSymbols}
+        hasFmpKey={hasFmpKey}
+        liveUniverse={liveUniverse}
+        onRefreshLiveUniverse={liveUniverse.refresh}
+      />
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', marginBottom: 16 }}>
         <button
@@ -441,7 +514,7 @@ export default function ChartScanner({
             padding: '10px 16px',
             borderRadius: 8,
             border: '1px solid #334155',
-            background: '#0f172a',
+            background: 'var(--tp-bg-sidebar)',
             color: results.length ? '#e2e8f0' : '#64748b',
             fontWeight: 600,
             fontSize: 13,
@@ -470,17 +543,20 @@ export default function ChartScanner({
         <span style={{ fontSize: 12, color: connection?.status === 'connected' ? '#22c55e' : '#64748b' }}>
           IB {connection?.status || 'offline'}
         </span>
-        <span style={{ fontSize: 12, color: '#64748b' }}>
+        <span style={{ fontSize: 12, color: 'var(--tp-text-muted)' }}>
           Live quotes: {livePriced}/{universeTickers.length}
         </span>
         {lastScanAt && (
-          <span style={{ fontSize: 12, color: '#475569' }}>
+          <span style={{ fontSize: 12, color: 'var(--tp-text-faint)' }}>
             Last scan {new Date(lastScanAt).toLocaleTimeString()}
           </span>
         )}
         {scanning && progress && (
           <span style={{ fontSize: 12, color: '#818cf8' }}>
             {progress.symbol} ({progress.idx}/{progress.total})
+            {scanLimits.estimateSec > 0 && progress.phase === 'bars' && (
+              <span style={{ color: 'var(--tp-text-muted)' }}> · est. {formatScanEstimate(scanLimits.estimateSec)} total</span>
+            )}
           </span>
         )}
         {backtesting && backtestProgress && (
@@ -489,11 +565,243 @@ export default function ChartScanner({
           </span>
         )}
         {lastBacktestAt && !backtesting && (
-          <span style={{ fontSize: 12, color: '#475569' }}>
+          <span style={{ fontSize: 12, color: 'var(--tp-text-faint)' }}>
             Last backtest {new Date(lastBacktestAt).toLocaleTimeString()}
           </span>
         )}
+        {hasFmpKey && (
+          <button
+            type="button"
+            onClick={loadFundSnapshots}
+            disabled={snapLoading || !universeTickers.length}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 8,
+              border: '1px solid #334155',
+              background: 'var(--tp-bg-sidebar)',
+              color: 'var(--tp-text-secondary)',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: snapLoading ? 'wait' : 'pointer',
+            }}
+          >
+            {snapLoading ? 'Loading caps…' : 'Refresh market caps'}
+          </button>
+        )}
       </div>
+
+      {needsMktCap && !hasFmpKey && (
+        <div style={{ color: '#f59e0b', fontSize: 13, marginBottom: 12 }}>
+          Market cap filter/column needs an FMP API key in Settings (same as Stock Screener).
+        </div>
+      )}
+      {snapError && (
+        <div style={{ color: '#f59e0b', fontSize: 13, marginBottom: 12 }}>{snapError}</div>
+      )}
+
+      {scanError && <div style={{ color: '#f59e0b', fontSize: 13, marginBottom: 12 }}>{scanError}</div>}
+
+      {displayed.length === 0 && !scanning && (
+        <div
+          style={{
+            padding: 40,
+            textAlign: 'center',
+            color: 'var(--tp-text-faint)',
+            border: '1px dashed var(--tp-border)',
+            borderRadius: 12,
+            marginBottom: 24,
+          }}
+        >
+          {results.length
+            ? `No rows match signal view or result filters (${results.length} raw).`
+            : 'Pick a preset or scan setup, then run chart scan.'}
+        </div>
+      )}
+
+      {displayed.length > 0 && (
+        <div style={{ overflow: 'auto', border: '1px solid var(--tp-border)', borderRadius: 12, marginBottom: 24 }}>
+          <div
+            style={{
+              padding: '10px 14px',
+              borderBottom: '1px solid var(--tp-border)',
+              fontSize: 12,
+              color: 'var(--tp-text-muted)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 8,
+            }}
+          >
+            <span>
+              Showing <strong style={{ color: 'var(--tp-text-secondary)' }}>{displayed.length}</strong> of {results.length} scanned
+            </span>
+            <span>{barOpt.label}</span>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
+            <thead>
+              <tr style={{ background: 'var(--tp-bg-input)' }}>
+                {tableHeaders.map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      textAlign: 'left',
+                      padding: '10px 12px',
+                      fontSize: 10,
+                      color: 'var(--tp-text-muted)',
+                      textTransform: 'uppercase',
+                      borderBottom: '1px solid var(--tp-border)',
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {displayed.map((row) => {
+                const q = quotes[row.symbol];
+                const px = displayPrice(q) ?? row.live ?? row.metrics?.close;
+                const ch = displayChangePct(q);
+                const m = row.metrics || {};
+                const smaTrend =
+                  m.sma20 != null && m.sma50 != null
+                    ? m.sma20 > m.sma50
+                      ? '▲ bull'
+                      : '▼ bear'
+                    : '—';
+                const emaTrend =
+                  m.ema9 != null && m.ema21 != null
+                    ? m.ema9 > m.ema21
+                      ? '▲'
+                      : '▼'
+                    : '—';
+                const cells = [
+                  <td key="sym" style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--tp-text-strong)' }}>
+                    {row.symbol}
+                  </td>,
+                  <td key="sig" style={{ padding: '10px 12px', fontWeight: 800, color: signalColor(row.signal) }}>
+                    {row.signal}
+                  </td>,
+                  <td key="str" style={{ padding: '10px 12px', color: '#818cf8' }}>
+                    {row.strength || '—'}
+                  </td>,
+                  <td
+                    key="px"
+                    style={{
+                      padding: '10px 12px',
+                      fontFamily: 'ui-monospace, monospace',
+                      color: 'var(--tp-text)',
+                    }}
+                  >
+                    {px != null ? Number(px).toFixed(2) : '—'}
+                  </td>,
+                  <td
+                    key="ch"
+                    style={{
+                      padding: '10px 12px',
+                      fontFamily: 'ui-monospace, monospace',
+                      color: ch == null ? '#475569' : ch >= 0 ? '#22c55e' : '#ef4444',
+                    }}
+                  >
+                    {ch != null ? `${ch >= 0 ? '+' : ''}${ch.toFixed(2)}%` : '—'}
+                  </td>,
+                ];
+                if (cols.change5) {
+                  cells.push(
+                    <td key="c5" style={{ padding: '10px 12px', fontFamily: 'ui-monospace, monospace' }}>
+                      {m.change5 != null ? `${m.change5 >= 0 ? '+' : ''}${m.change5.toFixed(2)}%` : '—'}
+                    </td>,
+                  );
+                }
+                if (cols.pctSma50) {
+                  cells.push(
+                    <td key="s50" style={{ padding: '10px 12px', fontFamily: 'ui-monospace, monospace' }}>
+                      {m.pctFromSma50 != null ? `${m.pctFromSma50 >= 0 ? '+' : ''}${m.pctFromSma50.toFixed(2)}%` : '—'}
+                    </td>,
+                  );
+                }
+                cells.push(
+                  <td key="rsi" style={{ padding: '10px 12px', fontFamily: 'ui-monospace, monospace' }}>
+                    {m.rsi != null ? m.rsi.toFixed(1) : '—'}
+                  </td>,
+                );
+                if (cols.emaTrend) {
+                  cells.push(
+                    <td key="ema" style={{ padding: '10px 12px', fontSize: 11, color: 'var(--tp-text-secondary)' }}>
+                      {emaTrend}
+                    </td>,
+                  );
+                }
+                cells.push(
+                  <td key="sma" style={{ padding: '10px 12px', fontSize: 11, color: 'var(--tp-text-secondary)' }}>
+                    {smaTrend}
+                  </td>,
+                  <td key="macd" style={{ padding: '10px 12px', fontFamily: 'ui-monospace, monospace' }}>
+                    {m.macdHist != null ? m.macdHist.toFixed(3) : '—'}
+                  </td>,
+                );
+                if (cols.volRatio) {
+                  cells.push(
+                    <td key="vol" style={{ padding: '10px 12px', fontFamily: 'ui-monospace, monospace' }}>
+                      {m.volRatio != null ? `${m.volRatio.toFixed(2)}×` : '—'}
+                    </td>,
+                  );
+                }
+                if (cols.marketCap) {
+                  const mcap = marketCapFromSnapshots(fundSnapshots, row.symbol);
+                  cells.push(
+                    <td key="mcap" style={{ padding: '10px 12px', fontFamily: 'ui-monospace, monospace' }}>
+                      {fmtMktCap(mcap)}
+                    </td>,
+                  );
+                }
+                if (cols.atrPct) {
+                  cells.push(
+                    <td key="atr" style={{ padding: '10px 12px', fontFamily: 'ui-monospace, monospace' }}>
+                      {m.atrPct != null ? `${m.atrPct.toFixed(2)}%` : '—'}
+                    </td>,
+                  );
+                }
+                if (cols.bbWidth) {
+                  cells.push(
+                    <td key="bb" style={{ padding: '10px 12px', fontFamily: 'ui-monospace, monospace' }}>
+                      {m.bbWidth != null ? `${m.bbWidth.toFixed(2)}%` : '—'}
+                    </td>,
+                  );
+                }
+                cells.push(
+                  <td key="rsn" style={{ padding: '10px 12px', fontSize: 11, color: 'var(--tp-text-muted)', maxWidth: 260 }}>
+                    {(row.reasons || []).slice(0, 3).join(' · ') || row.error || '—'}
+                  </td>,
+                  <td key="btn" style={{ padding: '10px 12px' }}>
+                    <button
+                      type="button"
+                      onClick={() => onOpenTerminal?.(row.symbol)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        border: 'none',
+                        background: '#6366f1',
+                        color: '#fff',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Chart
+                    </button>
+                  </td>,
+                );
+                return (
+                  <tr key={row.symbol} style={{ borderBottom: '1px solid #0f1424' }}>
+                    {cells}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {backtestError && <div style={{ color: '#f59e0b', fontSize: 13, marginBottom: 12 }}>{backtestError}</div>}
 
@@ -512,119 +820,6 @@ export default function ChartScanner({
         inputStyle={inputStyle}
         labelStyle={labelStyle}
       />
-
-      {scanError && <div style={{ color: '#f59e0b', fontSize: 13, marginBottom: 12 }}>{scanError}</div>}
-
-      {displayed.length === 0 && !scanning && (
-        <div
-          style={{
-            padding: 40,
-            textAlign: 'center',
-            color: '#475569',
-            border: '1px dashed #1a2035',
-            borderRadius: 12,
-          }}
-        >
-          {results.length ? 'No rows match the signal filter.' : 'Configure universe and strategy, then run chart scan.'}
-        </div>
-      )}
-
-      {displayed.length > 0 && (
-        <div style={{ overflow: 'auto', border: '1px solid #1a2035', borderRadius: 12 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 960 }}>
-            <thead>
-              <tr style={{ background: '#060b16' }}>
-                {['Symbol', 'Signal', 'Str', 'Last', 'Chg%', 'RSI', 'SMA20/50', 'MACD hist', 'Reasons', ''].map(
-                  (h) => (
-                    <th
-                      key={h}
-                      style={{
-                        textAlign: 'left',
-                        padding: '10px 12px',
-                        fontSize: 10,
-                        color: '#64748b',
-                        textTransform: 'uppercase',
-                        borderBottom: '1px solid #1a2035',
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ),
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {displayed.map((row) => {
-                const q = quotes[row.symbol];
-                const px = displayPrice(q) ?? row.live ?? row.metrics?.close;
-                const ch = displayChangePct(q);
-                const m = row.metrics || {};
-                const smaTrend =
-                  m.sma20 != null && m.sma50 != null
-                    ? m.sma20 > m.sma50
-                      ? '▲ bull'
-                      : '▼ bear'
-                    : '—';
-                return (
-                  <tr key={row.symbol} style={{ borderBottom: '1px solid #0f1424' }}>
-                    <td style={{ padding: '10px 12px', fontWeight: 700, color: '#f8fafc' }}>{row.symbol}</td>
-                    <td style={{ padding: '10px 12px', fontWeight: 800, color: signalColor(row.signal) }}>
-                      {row.signal}
-                    </td>
-                    <td style={{ padding: '10px 12px', color: '#818cf8' }}>{row.strength || '—'}</td>
-                    <td
-                      style={{
-                        padding: '10px 12px',
-                        fontFamily: 'ui-monospace, monospace',
-                        color: '#e2e8f0',
-                      }}
-                    >
-                      {px != null ? Number(px).toFixed(2) : '—'}
-                    </td>
-                    <td
-                      style={{
-                        padding: '10px 12px',
-                        fontFamily: 'ui-monospace, monospace',
-                        color: ch == null ? '#475569' : ch >= 0 ? '#22c55e' : '#ef4444',
-                      }}
-                    >
-                      {ch != null ? `${ch >= 0 ? '+' : ''}${ch.toFixed(2)}%` : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', fontFamily: 'ui-monospace, monospace' }}>
-                      {m.rsi != null ? m.rsi.toFixed(1) : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', fontSize: 11, color: '#94a3b8' }}>{smaTrend}</td>
-                    <td style={{ padding: '10px 12px', fontFamily: 'ui-monospace, monospace' }}>
-                      {m.macdHist != null ? m.macdHist.toFixed(3) : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px', fontSize: 11, color: '#64748b', maxWidth: 280 }}>
-                      {(row.reasons || []).slice(0, 3).join(' · ') || row.error || '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      <button
-                        type="button"
-                        onClick={() => onOpenTerminal?.(row.symbol)}
-                        style={{
-                          padding: '4px 10px',
-                          borderRadius: 6,
-                          border: 'none',
-                          background: '#6366f1',
-                          color: '#fff',
-                          fontSize: 11,
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Chart
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }

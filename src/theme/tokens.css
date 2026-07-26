@@ -1,0 +1,103 @@
+/* Theme tokens — set data-theme on <html> via ThemeProvider */
+
+:root,
+[data-theme='dark'] {
+  color-scheme: dark;
+  --tp-bg-app: #060b16;
+  --tp-bg-panel: #0a0f1e;
+  --tp-bg-elevated: #0a0f1e;
+  --tp-bg-input: #060b16;
+  --tp-bg-hover: #0d1220;
+  --tp-bg-active: #1a2035;
+  --tp-bg-inset: #060b16;
+  --tp-border: #1a2035;
+  --tp-border-strong: #334155;
+  --tp-text: #e2e8f0;
+  --tp-text-strong: #f8fafc;
+  --tp-text-title: #f1f5f9;
+  --tp-text-muted: #64748b;
+  --tp-text-faint: #475569;
+  --tp-text-dim: #334155;
+  --tp-text-foot: #1e293b;
+  --tp-text-secondary: #94a3b8;
+  --tp-accent: #6366f1;
+  --tp-accent-muted: #818cf8;
+  --tp-accent-soft: rgba(99, 102, 241, 0.13);
+  --tp-accent-border: rgba(99, 102, 241, 0.27);
+  --tp-accent-on-soft: #c7d2fe;
+  --tp-list-active-bg: rgba(99, 102, 241, 0.2);
+  --tp-shadow-dropdown: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --tp-overlay: rgba(0, 0, 0, 0.55);
+  --tp-danger-bg: rgba(69, 10, 10, 0.13);
+  --tp-danger-border: rgba(127, 29, 29, 0.33);
+  --tp-danger-text: #fca5a5;
+  --tp-chart-gutter: #050912;
+  --tp-chart-plot-bg: #060b16;
+  --tp-chart-scale-border: #334155;
+  --tp-chart-axis: #94a3b8;
+  --tp-chart-axis-muted: #64748b;
+  --tp-chart-separator: #475569;
+  --tp-chart-tooltip-bg: rgba(10, 15, 30, 0.92);
+  --tp-chart-tooltip-border: #334155;
+  --tp-chart-tooltip-shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
+  --tp-chart-crosshair-label-text: #f8fafc;
+  --tp-chart-bench-line: #475569;
+  --tp-chart-strategy-line: #2dd4bf;
+  --tp-chart-wf-line: #a78bfa;
+  --tp-panel-header-gradient: linear-gradient(180deg, #0f1629 0%, #0a0f1e 100%);
+  --tp-accent-banner-gradient: linear-gradient(90deg, rgba(30, 27, 75, 0.13) 0%, #0a0f1e 100%);
+  --tp-accent-heading: #c7d2fe;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --tp-bg-app: #eef2f7;
+  --tp-bg-panel: #ffffff;
+  --tp-bg-elevated: #ffffff;
+  --tp-bg-input: #ffffff;
+  --tp-bg-hover: #f8fafc;
+  --tp-bg-active: #e2e8f0;
+  --tp-bg-inset: #f1f5f9;
+  --tp-border: #e2e8f0;
+  --tp-border-strong: #cbd5e1;
+  --tp-text: #334155;
+  --tp-text-strong: #0f172a;
+  --tp-text-title: #1e293b;
+  --tp-text-muted: #64748b;
+  --tp-text-faint: #475569;
+  --tp-text-dim: #94a3b8;
+  --tp-text-foot: #94a3b8;
+  --tp-text-secondary: #64748b;
+  --tp-accent: #4f46e5;
+  --tp-accent-muted: #6366f1;
+  --tp-accent-soft: rgba(79, 70, 229, 0.1);
+  --tp-accent-border: rgba(79, 70, 229, 0.35);
+  --tp-accent-on-soft: #3730a3;
+  --tp-list-active-bg: rgba(79, 70, 229, 0.14);
+  --tp-shadow-dropdown: 0 12px 32px rgba(15, 23, 42, 0.12);
+  --tp-overlay: rgba(15, 23, 42, 0.4);
+  --tp-danger-bg: rgba(254, 226, 226, 0.85);
+  --tp-danger-border: rgba(248, 113, 113, 0.45);
+  --tp-danger-text: #b91c1c;
+  --tp-chart-gutter: #f1f5f9;
+  --tp-chart-plot-bg: #ffffff;
+  --tp-chart-scale-border: #cbd5e1;
+  --tp-chart-axis: #64748b;
+  --tp-chart-axis-muted: #94a3b8;
+  --tp-chart-separator: #cbd5e1;
+  --tp-chart-tooltip-bg: rgba(255, 255, 255, 0.96);
+  --tp-chart-tooltip-border: #e2e8f0;
+  --tp-chart-tooltip-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+  --tp-chart-crosshair-label-text: #ffffff;
+  --tp-chart-bench-line: #94a3b8;
+  --tp-chart-strategy-line: #0d9488;
+  --tp-chart-wf-line: #7c3aed;
+  --tp-panel-header-gradient: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+  --tp-accent-banner-gradient: linear-gradient(90deg, rgba(79, 70, 229, 0.1) 0%, #ffffff 100%);
+  --tp-accent-heading: #4338ca;
+}
+
+body {
+  background: var(--tp-bg-app);
+  color: var(--tp-text);
+}

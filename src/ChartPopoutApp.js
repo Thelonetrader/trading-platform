@@ -24,7 +24,7 @@ export default function ChartPopoutApp() {
 
   if (!q.symbol) {
     return (
-      <div style={{ padding: 24, color: '#94a3b8', background: '#060b16', minHeight: '100vh' }}>
+      <div style={{ padding: 24, color: 'var(--tp-text-secondary)', background: 'var(--tp-bg-app)', minHeight: '100vh' }}>
         No symbol in chart window URL.
       </div>
     );
@@ -34,7 +34,7 @@ export default function ChartPopoutApp() {
     <div
       style={{
         minHeight: '100vh',
-        background: '#060b16',
+        background: 'var(--tp-bg-app)',
         padding: 16,
         boxSizing: 'border-box',
         display: 'flex',
@@ -42,8 +42,8 @@ export default function ChartPopoutApp() {
       }}
     >
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 22, fontWeight: 800, color: '#f8fafc' }}>{q.symbol}</div>
-        <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--tp-text-strong)' }}>{q.symbol}</div>
+        <div style={{ fontSize: 12, color: 'var(--tp-text-muted)', marginTop: 4 }}>
           {q.exchange} · {q.currency}
           {q.primaryExch ? ` · ${q.primaryExch}` : ''} · IB {connection.status}
         </div>

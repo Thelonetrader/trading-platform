@@ -111,8 +111,8 @@ export default function AgentPanel({
   return (
     <div
       style={{
-        background: '#0a0f1e',
-        border: '1px solid #1a2035',
+        background: 'var(--tp-bg-panel)',
+        border: '1px solid var(--tp-border)',
         borderRadius: 12,
         padding: 16,
         display: 'flex',
@@ -126,7 +126,7 @@ export default function AgentPanel({
         <span style={{ fontSize: 11, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700 }}>
           AI research assistant
         </span>
-        <span style={{ fontSize: 10, color: '#475569' }}>
+        <span style={{ fontSize: 10, color: 'var(--tp-text-faint)' }}>
           {profileLabel
             ? `${profileLabel}${profileTier === 'free' ? ' · Free' : profileTier === 'byok' ? ' · BYOK' : ''}`
             : 'Configure in Settings → AI assistant'}
@@ -141,7 +141,7 @@ export default function AgentPanel({
       )}
 
       {isElectron && !enabled && (
-        <p style={{ margin: 0, fontSize: 12, color: '#94a3b8' }}>
+        <p style={{ margin: 0, fontSize: 12, color: 'var(--tp-text-secondary)' }}>
           Turn on in Settings → AI assistant, install{' '}
           <a href="https://ollama.com" style={{ color: '#818cf8' }}>
             Ollama
@@ -163,8 +163,8 @@ export default function AgentPanel({
         style={{
           flex: 1,
           overflowY: 'auto',
-          background: '#060b16',
-          border: '1px solid #1a2035',
+          background: 'var(--tp-bg-input)',
+          border: '1px solid var(--tp-border)',
           borderRadius: 8,
           padding: 12,
           fontSize: 13,
@@ -173,7 +173,7 @@ export default function AgentPanel({
         }}
       >
         {!messages.length && (
-          <div style={{ color: '#475569' }}>
+          <div style={{ color: 'var(--tp-text-faint)' }}>
             Ask about {symbol || 'a ticker'} — uses your watchlist notes, scorecard, FMP metrics (if keyed), and quote
             context. Responses are not financial advice.
           </div>
@@ -186,7 +186,7 @@ export default function AgentPanel({
             <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
           </div>
         ))}
-        {busy && <div style={{ color: '#64748b', fontSize: 12 }}>Thinking…</div>}
+        {busy && <div style={{ color: 'var(--tp-text-muted)', fontSize: 12 }}>Thinking…</div>}
       </div>
 
       {error && <div style={{ fontSize: 12, color: '#f59e0b' }}>{error}</div>}
@@ -205,10 +205,10 @@ export default function AgentPanel({
           disabled={busy}
           style={{
             flex: 1,
-            background: '#060b16',
+            background: 'var(--tp-bg-input)',
             border: '1px solid #334155',
             borderRadius: 8,
-            color: '#f8fafc',
+            color: 'var(--tp-text-strong)',
             fontSize: 14,
             padding: '10px 12px',
             outline: 'none',
@@ -226,9 +226,9 @@ const ghostBtn = {
   marginLeft: 'auto',
   padding: '2px 8px',
   borderRadius: 6,
-  border: '1px solid #1a2035',
+  border: '1px solid var(--tp-border)',
   background: 'transparent',
-  color: '#64748b',
+  color: 'var(--tp-text-muted)',
   fontSize: 11,
   cursor: 'pointer',
 };
@@ -236,9 +236,9 @@ const ghostBtn = {
 const chipBtn = {
   padding: '4px 8px',
   borderRadius: 999,
-  border: '1px solid #1a2035',
-  background: '#060b16',
-  color: '#94a3b8',
+  border: '1px solid var(--tp-border)',
+  background: 'var(--tp-bg-input)',
+  color: 'var(--tp-text-secondary)',
   fontSize: 10,
   cursor: 'pointer',
   maxWidth: 220,
@@ -249,7 +249,7 @@ const primaryBtn = {
   borderRadius: 8,
   border: 'none',
   background: '#6366f1',
-  color: '#f8fafc',
+  color: 'var(--tp-text-strong)',
   fontWeight: 600,
   fontSize: 13,
   cursor: 'pointer',

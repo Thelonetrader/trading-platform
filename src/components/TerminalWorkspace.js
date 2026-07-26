@@ -9,6 +9,7 @@ import { RESEARCH_DATA_IMPORTED_EVENT } from '../utils/dataBackup';
 import { getSymbolResearchContext } from '../utils/symbolResearch';
 import { SECTORS, getRatingColor } from '../scorecards/model';
 import { displayChangePct, displayPrice } from '../utils/quoteDisplay';
+import { formatSectorDisplay } from '../utils/sectorDisplay';
 
 function TerminalSymbolField({ symbol, onSymbolChange }) {
   const inputRef = useRef(null);
@@ -55,8 +56,8 @@ function TerminalSymbolField({ symbol, onSymbolChange }) {
           style={{
             fontSize: 28,
             fontWeight: 800,
-            color: '#f8fafc',
-            background: '#060b16',
+            color: 'var(--tp-text-strong)',
+            background: 'var(--tp-bg-input)',
             border: '1px solid #6366f1',
             borderRadius: 8,
             padding: '8px 12px',
@@ -67,7 +68,7 @@ function TerminalSymbolField({ symbol, onSymbolChange }) {
           }}
           aria-label="Ticker symbol"
         />
-        <span style={{ fontSize: 11, color: '#64748b' }}>Enter to load · Esc to cancel · ⌘K also works</span>
+        <span style={{ fontSize: 11, color: 'var(--tp-text-muted)' }}>Enter to load · Esc to cancel · ⌘K also works</span>
       </div>
     );
   }
@@ -91,7 +92,7 @@ function TerminalSymbolField({ symbol, onSymbolChange }) {
         style={{
           fontSize: 32,
           fontWeight: 800,
-          color: '#f8fafc',
+          color: 'var(--tp-text-strong)',
           borderBottom: '2px dashed #334155',
         }}
       >
@@ -110,8 +111,8 @@ function ResearchCard({ title, children, action }) {
       style={{
         flex: 1,
         minWidth: 200,
-        background: '#060b16',
-        border: '1px solid #1a2035',
+        background: 'var(--tp-bg-input)',
+        border: '1px solid var(--tp-border)',
         borderRadius: 10,
         padding: 16,
         display: 'flex',
@@ -120,7 +121,7 @@ function ResearchCard({ title, children, action }) {
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <div style={{ fontSize: 11, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+        <div style={{ fontSize: 11, color: 'var(--tp-text-faint)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           {title}
         </div>
         {action}
@@ -133,7 +134,7 @@ function ResearchCard({ title, children, action }) {
 const btnGhost = {
   padding: '4px 10px',
   borderRadius: 6,
-  border: '1px solid #1a2035',
+  border: '1px solid var(--tp-border)',
   background: 'transparent',
   color: '#818cf8',
   fontSize: 11,
@@ -204,25 +205,25 @@ export default function TerminalWorkspace({
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
           <div
             style={{
-              background: '#0a0f1e',
-              border: '1px solid #1a2035',
+              background: 'var(--tp-bg-panel)',
+              border: '1px solid var(--tp-border)',
               borderRadius: 12,
               padding: 20,
             }}
           >
-            <div style={{ fontSize: 11, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+            <div style={{ fontSize: 11, color: 'var(--tp-text-faint)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
               Active symbol
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
               <TerminalSymbolField symbol={symbol} onSymbolChange={onSymbolChange} />
               {symbol && watch?.name && (
-                <span style={{ fontSize: 16, color: '#94a3b8', alignSelf: 'center' }}>{watch.name}</span>
+                <span style={{ fontSize: 16, color: 'var(--tp-text-secondary)', alignSelf: 'center' }}>{watch.name}</span>
               )}
               {symbol && !watch?.name && resolvedName && (
-                <span style={{ fontSize: 16, color: '#94a3b8', alignSelf: 'center' }}>{resolvedName}</span>
+                <span style={{ fontSize: 16, color: 'var(--tp-text-secondary)', alignSelf: 'center' }}>{resolvedName}</span>
               )}
               {symbol && px != null && (
-                <span style={{ fontSize: 20, color: '#e2e8f0', alignSelf: 'center' }}>{px.toFixed(2)}</span>
+                <span style={{ fontSize: 20, color: 'var(--tp-text)', alignSelf: 'center' }}>{px.toFixed(2)}</span>
               )}
               {symbol && chg != null && (
                 <span style={{ color: chg >= 0 ? '#22c55e' : '#ef4444', alignSelf: 'center' }}>
@@ -231,7 +232,7 @@ export default function TerminalWorkspace({
                 </span>
               )}
             </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: '#64748b', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--tp-text-muted)', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <span>
                 {listingExchange ? `Listed ${listingExchange}` : exchange || 'SMART'}
                 {primaryExch && exchange === 'SMART' ? ` · ${primaryExch}` : ''}
@@ -243,7 +244,7 @@ export default function TerminalWorkspace({
                   {watch.priority} priority
                 </span>
               )}
-              {watch?.sector && <span>{watch.sector}</span>}
+              {watch?.sector && <span>{formatSectorDisplay(watch.sector)}</span>}
             </div>
           </div>
 
@@ -252,13 +253,13 @@ export default function TerminalWorkspace({
               style={{
                 flex: 1,
                 minHeight: 280,
-                background: '#0a0f1e',
-                border: '1px dashed #1a2035',
+                background: 'var(--tp-bg-panel)',
+                border: '1px dashed var(--tp-border)',
                 borderRadius: 12,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#475569',
+                color: 'var(--tp-text-faint)',
                 fontSize: 14,
                 padding: 24,
                 textAlign: 'center',
@@ -298,8 +299,8 @@ export default function TerminalWorkspace({
               <div
                 style={{
                   flex: 1,
-                  background: '#0a0f1e',
-                  border: '1px solid #1a2035',
+                  background: 'var(--tp-bg-panel)',
+                  border: '1px solid var(--tp-border)',
                   borderRadius: 12,
                   padding: 16,
                   display: 'flex',
@@ -326,16 +327,16 @@ export default function TerminalWorkspace({
                       {watch.notes ? (
                         <p style={{ margin: 0, fontSize: 13, color: '#cbd5e1', lineHeight: 1.5 }}>{watch.notes}</p>
                       ) : (
-                        <p style={{ margin: 0, fontSize: 13, color: '#475569' }}>No notes on watchlist.</p>
+                        <p style={{ margin: 0, fontSize: 13, color: 'var(--tp-text-faint)' }}>No notes on watchlist.</p>
                       )}
                       {watch.buyPrice && (
-                        <div style={{ fontSize: 12, color: '#64748b' }}>
+                        <div style={{ fontSize: 12, color: 'var(--tp-text-muted)' }}>
                           Target / ref: {watch.buyPrice}
                         </div>
                       )}
                     </>
                   ) : (
-                    <p style={{ margin: 0, fontSize: 13, color: '#475569' }}>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--tp-text-faint)' }}>
                       Not on watchlist — add in Watchlist to keep thesis and priority here.
                     </p>
                   )}
@@ -359,14 +360,14 @@ export default function TerminalWorkspace({
                     <>
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
                         <span style={{ fontSize: 22, fontWeight: 800, color: ratingColor }}>{scorecard.ratingShort}</span>
-                        <span style={{ fontSize: 14, color: '#94a3b8' }}>{scorecard.ratingLabel}</span>
+                        <span style={{ fontSize: 14, color: 'var(--tp-text-secondary)' }}>{scorecard.ratingLabel}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: '#64748b' }}>
+                      <div style={{ fontSize: 12, color: 'var(--tp-text-muted)' }}>
                         {sectorMeta?.label || scorecard.sectorId} · {scorecard.avg.toFixed(2)} / 5
                       </div>
                     </>
                   ) : (
-                    <p style={{ margin: 0, fontSize: 13, color: '#475569' }}>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--tp-text-faint)' }}>
                       No saved scorecard — run sector metrics and Save to library.
                     </p>
                   )}
@@ -391,17 +392,17 @@ export default function TerminalWorkspace({
                       {journal.snippet ? (
                         <p style={{ margin: 0, fontSize: 13, color: '#cbd5e1', lineHeight: 1.5 }}>{journal.snippet}</p>
                       ) : (
-                        <p style={{ margin: 0, fontSize: 13, color: '#475569' }}>No reasoning text on latest entry.</p>
+                        <p style={{ margin: 0, fontSize: 13, color: 'var(--tp-text-faint)' }}>No reasoning text on latest entry.</p>
                       )}
                     </>
                   ) : (
-                    <p style={{ margin: 0, fontSize: 13, color: '#475569' }}>
+                    <p style={{ margin: 0, fontSize: 13, color: 'var(--tp-text-faint)' }}>
                       No journal entries for this ticker yet.
                     </p>
                   )}
                 </ResearchCard>
               </div>
-              <div style={{ fontSize: 11, color: '#334155', borderTop: '1px solid #1a2035', paddingTop: 10 }}>
+              <div style={{ fontSize: 11, color: 'var(--tp-text-dim)', borderTop: '1px solid var(--tp-border)', paddingTop: 10 }}>
                 Daily / weekly bars from IB · orders execute via ticket or TWS
               </div>
             </div>
@@ -415,6 +416,7 @@ export default function TerminalWorkspace({
           currency={currency}
           primaryExch={primaryExch}
           listingExchange={listingExchange}
+          watchSector={watch?.sector}
           quote={quote}
           securityName={watch?.name || resolvedName}
           connection={connection}

@@ -373,7 +373,7 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
 
   if (!bars.length) {
     return (
-      <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', fontSize: 13 }}>
+      <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--tp-text-faint)', fontSize: 13 }}>
         No bars returned
       </div>
     );
@@ -403,7 +403,7 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
           flexWrap: 'wrap',
         }}
       >
-        <span style={{ fontSize: 10, color: '#475569' }}>
+        <span style={{ fontSize: 10, color: 'var(--tp-text-faint)' }}>
           {visibleBars.length} of {bars.length} bars · drag or scroll to move time · ⌘/ctrl + scroll to zoom
         </span>
         <button type="button" style={zoomBtn} disabled={!canPanLeft} onClick={() => panBy(-Math.max(1, Math.floor(visibleBars.length * 0.15)))}>
@@ -424,8 +424,8 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
         <button type="button" style={zoomBtn} onClick={() => applyRange(0, bars.length - 1)}>
           All
         </button>
-        <span style={{ width: 1, height: 14, background: '#1a2035', margin: '0 2px' }} />
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#64748b' }}>
+        <span style={{ width: 1, height: 14, background: 'var(--tp-bg-active)', margin: '0 2px' }} />
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--tp-text-muted)' }}>
           Vol height
           <input
             type="range"
@@ -433,10 +433,10 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
             max={50}
             value={Math.round(volPaneShare * 100)}
             onChange={(e) => setVolPaneShare(clampVolPaneShare(Number(e.target.value) / 100))}
-            style={{ width: 72, accentColor: '#6366f1' }}
+            style={{ width: 72, accentColor: 'var(--tp-accent)' }}
           />
         </label>
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#64748b' }}>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--tp-text-muted)' }}>
           Vol scale
           <input
             type="range"
@@ -444,9 +444,9 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
             max={400}
             value={Math.round(volScale * 100)}
             onChange={(e) => setVolScale(clampVolScale(Number(e.target.value) / 100))}
-            style={{ width: 72, accentColor: '#6366f1' }}
+            style={{ width: 72, accentColor: 'var(--tp-accent)' }}
           />
-          <span style={{ color: '#475569', minWidth: 32 }}>{Math.round(volScale * 100)}%</span>
+          <span style={{ color: 'var(--tp-text-faint)', minWidth: 32 }}>{Math.round(volScale * 100)}%</span>
         </label>
       </div>
       {hoverBar && (
@@ -457,23 +457,23 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
             left: tooltipLeft,
             zIndex: 2,
             pointerEvents: 'none',
-            background: '#0a0f1ee6',
-            border: '1px solid #334155',
+            background: 'var(--tp-chart-tooltip-bg)',
+            border: '1px solid var(--tp-chart-tooltip-border)',
             borderRadius: 8,
             padding: '8px 12px',
             fontSize: 11,
-            color: '#e2e8f0',
+            color: 'var(--tp-text)',
             lineHeight: 1.55,
             minWidth: 168,
-            boxShadow: '0 8px 24px #00000060',
+            boxShadow: 'var(--tp-chart-tooltip-shadow)',
           }}
         >
-          <div style={{ fontWeight: 700, color: '#f8fafc', marginBottom: 4 }}>
+          <div style={{ fontWeight: 700, color: 'var(--tp-text-strong)', marginBottom: 4 }}>
             {formatBarDateTime(hoverBar.time, barSize)}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 10px', color: '#94a3b8' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 10px', color: 'var(--tp-text-secondary)' }}>
             <span>O</span>
-            <span style={{ color: '#f1f5f9', fontVariantNumeric: 'tabular-nums' }}>{hoverBar.open.toFixed(2)}</span>
+            <span style={{ color: 'var(--tp-text-title)', fontVariantNumeric: 'tabular-nums' }}>{hoverBar.open.toFixed(2)}</span>
             <span>H</span>
             <span style={{ color: '#22c55e', fontVariantNumeric: 'tabular-nums' }}>{hoverBar.high.toFixed(2)}</span>
             <span>L</span>
@@ -483,7 +483,7 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
               {hoverBar.close.toFixed(2)}
             </span>
             <span>Vol</span>
-            <span style={{ color: '#818cf8', fontVariantNumeric: 'tabular-nums' }}>{formatVolume(hoverBar.volume)}</span>
+            <span style={{ color: 'var(--tp-accent-muted)', fontVariantNumeric: 'tabular-nums' }}>{formatVolume(hoverBar.volume)}</span>
           </div>
         </div>
       )}
@@ -523,20 +523,21 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
           if (x >= plotLeft && x < plotRight) jumpToRecent();
         }}
       >
+      <rect x={plotLeft} y={pad.top} width={innerW} height={Math.max(1, priceH - pad.top)} fill="var(--tp-chart-plot-bg)" />
       {/* Right price scale gutter */}
-      <rect x={plotRight} y={0} width={width - plotRight} height={priceH} fill="#050912" />
-      <line x1={plotRight + 0.5} x2={plotRight + 0.5} y1={pad.top} y2={priceH} stroke="#334155" strokeWidth={1} />
+      <rect x={plotRight} y={0} width={width - plotRight} height={priceH} fill="var(--tp-chart-gutter)" />
+      <line x1={plotRight + 0.5} x2={plotRight + 0.5} y1={pad.top} y2={priceH} stroke="var(--tp-chart-scale-border)" strokeWidth={1} />
 
       {yTicks.map((v) => {
         const y = priceToY(v, minL, maxH, pad.top, innerH);
         return (
           <g key={v}>
-            <line x1={plotLeft} x2={plotRight} y1={y} y2={y} stroke="#1a2035" strokeWidth={1} />
+            <line x1={plotLeft} x2={plotRight} y1={y} y2={y} stroke='var(--tp-bg-active)' strokeWidth={1} />
             <text
               x={width - 8}
               y={y + 4}
               textAnchor="end"
-              fill="#94a3b8"
+              fill="var(--tp-chart-axis)"
               fontSize={10}
               fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
             >
@@ -553,7 +554,7 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
             x2={plotRight}
             y1={hoverCloseY}
             y2={hoverCloseY}
-            stroke="#6366f1"
+            stroke="var(--tp-accent)"
             strokeWidth={1}
             strokeDasharray="4 3"
             opacity={0.85}
@@ -564,13 +565,13 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
             width={pad.right - 8}
             height={18}
             rx={3}
-            fill="#6366f1"
+            fill="var(--tp-accent)"
           />
           <text
             x={width - 8}
             y={hoverCloseY + 4}
             textAnchor="end"
-            fill="#f8fafc"
+            fill="var(--tp-chart-crosshair-label-text)"
             fontSize={10}
             fontWeight={700}
             fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
@@ -597,9 +598,19 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
           x2={hover.cx}
           y1={pad.top}
           y2={volTop + volInnerH}
-          stroke="#6366f1"
+          stroke="var(--tp-accent)"
           strokeWidth={1}
           strokeDasharray="4 3"
+          pointerEvents="none"
+        />
+      )}
+      {maxVol > 0 && (
+        <rect
+          x={plotLeft}
+          y={volTop}
+          width={innerW}
+          height={volInnerH}
+          fill="var(--tp-chart-plot-bg)"
           pointerEvents="none"
         />
       )}
@@ -622,7 +633,7 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
             />
           );
         })}
-      <line x1={plotLeft} x2={plotRight} y1={priceH} y2={priceH} stroke="#475569" strokeWidth={1} />
+      <line x1={plotLeft} x2={plotRight} y1={priceH} y2={priceH} stroke="var(--tp-chart-separator)" strokeWidth={1} />
       <rect
         x={plotLeft}
         y={priceH - 4}
@@ -638,8 +649,8 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
           setVolResizing(true);
         }}
       />
-      <rect x={plotRight} y={priceH} width={width - plotRight} height={height - priceH} fill="#050912" />
-      <text x={width - 8} y={volTop + volInnerH / 2 + 3} textAnchor="end" fill="#64748b" fontSize={9}>
+      <rect x={plotRight} y={priceH} width={width - plotRight} height={height - priceH} fill="var(--tp-chart-gutter)" />
+      <text x={width - 8} y={volTop + volInnerH / 2 + 3} textAnchor="end" fill="var(--tp-chart-axis-muted)" fontSize={9}>
         Vol
       </text>
       <rect
@@ -650,12 +661,12 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
         fill="transparent"
       />
       {slots.length > 0 && (
-        <text x={plotLeft} y={height - 4} fill="#64748b" fontSize={10}>
+        <text x={plotLeft} y={height - 4} fill="var(--tp-chart-axis-muted)" fontSize={10}>
           {formatBarDate(slots[0].b.time, barSize)}
         </text>
       )}
       {slots.length > 1 && (
-        <text x={plotRight - 4} y={height - 4} textAnchor="end" fill="#64748b" fontSize={10}>
+        <text x={plotRight - 4} y={height - 4} textAnchor="end" fill="var(--tp-chart-axis-muted)" fontSize={10}>
           {formatBarDate(slots[slots.length - 1].b.time, barSize)}
         </text>
       )}
@@ -668,9 +679,9 @@ function CandleChart({ bars, width, height, barSize = '1 day', onViewChange }) {
 const zoomBtn = {
   padding: '2px 8px',
   borderRadius: 5,
-  border: '1px solid #1a2035',
-  background: '#0a0f1e',
-  color: '#818cf8',
+  border: '1px solid var(--tp-border)',
+  background: 'var(--tp-bg-panel)',
+  color: 'var(--tp-accent-muted)',
   fontSize: 11,
   fontWeight: 600,
   cursor: 'pointer',
@@ -756,9 +767,9 @@ export default function TerminalChart({
   const btnStyle = (active) => ({
     padding: '4px 10px',
     borderRadius: 6,
-    border: `1px solid ${active ? '#6366f1' : '#1a2035'}`,
-    background: active ? '#6366f118' : 'transparent',
-    color: active ? '#818cf8' : '#64748b',
+    border: `1px solid ${active ? 'var(--tp-accent)' : 'var(--tp-border)'}`,
+    background: active ? 'var(--tp-accent-soft)' : 'transparent',
+    color: active ? 'var(--tp-accent-muted)' : 'var(--tp-text-muted)',
     fontSize: 11,
     fontWeight: 600,
     cursor: 'pointer',
@@ -782,8 +793,8 @@ export default function TerminalChart({
     <div
       ref={containerRef}
       style={{
-        background: '#060b16',
-        border: '1px solid #1a2035',
+        background: 'var(--tp-chart-plot-bg)',
+        border: '1px solid var(--tp-border)',
         borderRadius: 10,
         padding: '12px 12px 8px',
         minHeight: expanded ? chartHeight : 280,
@@ -793,7 +804,7 @@ export default function TerminalChart({
       }}
     >
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 10 }}>
-        <span style={{ fontSize: 11, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700 }}>
+        <span style={{ fontSize: 11, color: 'var(--tp-accent)', textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 700 }}>
           Historical
         </span>
         <div style={{ display: 'flex', gap: 4 }}>
@@ -819,16 +830,16 @@ export default function TerminalChart({
           </button>
         )}
         {isIntradayBarSize(barSize) && (
-          <span style={{ fontSize: 10, color: '#475569', width: '100%' }}>
+          <span style={{ fontSize: 10, color: 'var(--tp-text-faint)', width: '100%' }}>
             Intraday bars are US regular hours (ET). Use 5D/1M range to scroll prior sessions.
           </span>
         )}
       </div>
       {error && !loading && (
-        <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>{error}</div>
+        <div style={{ fontSize: 12, color: 'var(--tp-text-secondary)', marginBottom: 8 }}>{error}</div>
       )}
       {loading && bars.length === 0 ? (
-        <div style={{ height: chartHeight - 40, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', flex: expanded ? 1 : undefined }}>
+        <div style={{ height: chartHeight - 40, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--tp-text-faint)', flex: expanded ? 1 : undefined }}>
           Loading bars from IB…
         </div>
       ) : (

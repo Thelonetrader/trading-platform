@@ -40,8 +40,8 @@ export default function QuoteStrip({ symbols, activeSymbol, quotes, connection, 
     <div
       style={{
         height: 40,
-        background: '#060b16',
-        borderBottom: '1px solid #1a2035',
+        background: 'var(--tp-bg-input)',
+        borderBottom: '1px solid var(--tp-border)',
         display: 'flex',
         alignItems: 'center',
         padding: '0 16px',
@@ -56,7 +56,7 @@ export default function QuoteStrip({ symbols, activeSymbol, quotes, connection, 
           flexShrink: 0,
           padding: '2px 8px',
           borderRadius: 4,
-          background: '#1a2035',
+          background: 'var(--tp-bg-active)',
           color: connColor,
           fontWeight: 600,
           textTransform: 'uppercase',
@@ -72,7 +72,7 @@ export default function QuoteStrip({ symbols, activeSymbol, quotes, connection, 
         </span>
       )}
       {isElectron && connection.status !== 'connected' && (
-        <span style={{ flexShrink: 0, color: '#64748b', fontSize: 11 }}>
+        <span style={{ flexShrink: 0, color: 'var(--tp-text-muted)', fontSize: 11 }}>
           Settings → Connect IB (TWS: port 7497 paper)
         </span>
       )}
@@ -101,11 +101,11 @@ export default function QuoteStrip({ symbols, activeSymbol, quotes, connection, 
               padding: '4px 10px',
               borderRadius: 6,
               border: active ? '1px solid #6366f1' : '1px solid transparent',
-              background: active ? '#1a2035' : 'transparent',
+              background: active ? 'var(--tp-bg-active)' : 'transparent',
             }}
           >
-            <span style={{ fontWeight: 700, color: '#e2e8f0' }}>{sym}</span>
-            <span style={{ color: '#94a3b8' }} title={q?.refFromHistory ? 'Last daily close (market closed / no delayed tick yet)' : undefined}>
+            <span style={{ fontWeight: 700, color: 'var(--tp-text)' }}>{sym}</span>
+            <span style={{ color: 'var(--tp-text-secondary)' }} title={q?.refFromHistory ? 'Last daily close (market closed / no delayed tick yet)' : undefined}>
               {fmtPrice(px)}
               {q?.refFromHistory ? '*' : ''}
             </span>

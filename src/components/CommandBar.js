@@ -28,15 +28,15 @@ export default function CommandBar({ open, onClose, onSubmit, message }) {
       <div
         style={{
           width: 'min(560px, 92vw)',
-          background: '#0a0f1e',
-          border: '1px solid #1a2035',
+          background: 'var(--tp-bg-panel)',
+          border: '1px solid var(--tp-border)',
           borderRadius: 12,
           padding: 16,
           boxShadow: '0 24px 48px rgba(0,0,0,0.45)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ fontSize: 11, color: '#475569', marginBottom: 8, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+        <div style={{ fontSize: 11, color: 'var(--tp-text-faint)', marginBottom: 8, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
           Command
         </div>
         <input
@@ -51,10 +51,10 @@ export default function CommandBar({ open, onClose, onSubmit, message }) {
           }}
           style={{
             width: '100%',
-            background: '#060b16',
+            background: 'var(--tp-bg-input)',
             border: '1px solid #334155',
             borderRadius: 8,
-            color: '#f8fafc',
+            color: 'var(--tp-text-strong)',
             fontSize: 15,
             padding: '12px 14px',
             outline: 'none',
@@ -62,9 +62,9 @@ export default function CommandBar({ open, onClose, onSubmit, message }) {
           }}
         />
         {message && (
-          <div style={{ marginTop: 10, fontSize: 12, color: '#94a3b8' }}>{message}</div>
+          <div style={{ marginTop: 10, fontSize: 12, color: 'var(--tp-text-secondary)' }}>{message}</div>
         )}
-        <div style={{ marginTop: 10, fontSize: 11, color: '#334155' }}>
+        <div style={{ marginTop: 10, fontSize: 11, color: 'var(--tp-text-dim)' }}>
           Esc close · Enter run · try <code style={{ color: '#6366f1' }}>help</code>
         </div>
       </div>

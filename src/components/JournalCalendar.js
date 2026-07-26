@@ -24,9 +24,9 @@ const toneStyles = {
     color: '#fde68a',
   },
   empty: {
-    background: '#060b16',
-    border: '1px solid #1a2035',
-    color: '#64748b',
+    background: 'var(--tp-bg-input)',
+    border: '1px solid var(--tp-border)',
+    color: 'var(--tp-text-muted)',
   },
 };
 
@@ -76,9 +76,9 @@ export default function JournalCalendar({ trades, selectedDate, onSelectDate }) 
   const navBtn = {
     padding: '6px 12px',
     borderRadius: 6,
-    border: '1px solid #1a2035',
+    border: '1px solid var(--tp-border)',
     background: 'transparent',
-    color: '#94a3b8',
+    color: 'var(--tp-text-secondary)',
     cursor: 'pointer',
     fontSize: 12,
     fontWeight: 600,
@@ -87,8 +87,8 @@ export default function JournalCalendar({ trades, selectedDate, onSelectDate }) 
   return (
     <div
       style={{
-        background: '#0a0f1e',
-        border: '1px solid #1a2035',
+        background: 'var(--tp-bg-panel)',
+        border: '1px solid var(--tp-border)',
         borderRadius: 12,
         padding: 20,
         marginBottom: 24,
@@ -108,7 +108,7 @@ export default function JournalCalendar({ trades, selectedDate, onSelectDate }) 
           <div
             style={{
               fontSize: 11,
-              color: '#475569',
+              color: 'var(--tp-text-faint)',
               textTransform: 'uppercase',
               letterSpacing: '0.1em',
               marginBottom: 4,
@@ -116,7 +116,7 @@ export default function JournalCalendar({ trades, selectedDate, onSelectDate }) 
           >
             P&amp;L calendar
           </div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#f1f5f9' }}>{label}</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--tp-text-title)' }}>{label}</div>
           <div style={{ fontSize: 12, color: monthNet >= 0 ? '#22c55e' : '#ef4444', marginTop: 4 }}>
             Month total: £{monthNet.toFixed(2)}
           </div>
@@ -156,7 +156,7 @@ export default function JournalCalendar({ trades, selectedDate, onSelectDate }) 
             key={wd}
             style={{
               fontSize: 10,
-              color: '#475569',
+              color: 'var(--tp-text-faint)',
               textTransform: 'uppercase',
               textAlign: 'center',
               fontWeight: 600,
@@ -219,7 +219,7 @@ export default function JournalCalendar({ trades, selectedDate, onSelectDate }) 
         })}
       </div>
 
-      <div style={{ display: 'flex', gap: 16, marginTop: 14, flexWrap: 'wrap', fontSize: 11, color: '#64748b' }}>
+      <div style={{ display: 'flex', gap: 16, marginTop: 14, flexWrap: 'wrap', fontSize: 11, color: 'var(--tp-text-muted)' }}>
         <span>
           <span style={{ color: '#22c55e' }}>■</span> Green day (net profit)
         </span>

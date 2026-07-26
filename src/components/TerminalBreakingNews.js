@@ -111,8 +111,8 @@ export default function TerminalBreakingNews({
   return (
     <div
       style={{
-        background: '#0a0f1e',
-        border: '1px solid #1a2035',
+        background: 'var(--tp-bg-panel)',
+        border: '1px solid var(--tp-border)',
         borderRadius: 12,
         overflow: 'hidden',
       }}
@@ -124,8 +124,8 @@ export default function TerminalBreakingNews({
           justifyContent: 'space-between',
           gap: 10,
           padding: '10px 14px',
-          borderBottom: '1px solid #1a2035',
-          background: 'linear-gradient(90deg, #1e1b4b22 0%, #0a0f1e 100%)',
+          borderBottom: '1px solid var(--tp-border)',
+          background: 'var(--tp-accent-banner-gradient)',
           flexWrap: 'wrap',
         }}
       >
@@ -141,10 +141,10 @@ export default function TerminalBreakingNews({
               flexShrink: 0,
             }}
           />
-          <span style={{ fontSize: 11, fontWeight: 800, color: '#c7d2fe', letterSpacing: '0.12em' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--tp-accent-heading)', letterSpacing: '0.12em' }}>
             BREAKING NEWS
           </span>
-          <span style={{ fontSize: 10, color: '#475569' }}>{scopeLabel}</span>
+          <span style={{ fontSize: 10, color: 'var(--tp-text-faint)' }}>{scopeLabel}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span
@@ -155,8 +155,8 @@ export default function TerminalBreakingNews({
               letterSpacing: '0.08em',
               padding: '2px 6px',
               borderRadius: 4,
-              border: '1px solid #1a2035',
-              color: '#64748b',
+              border: '1px solid var(--tp-border)',
+              color: 'var(--tp-text-muted)',
             }}
           >
             {providerLabel}
@@ -177,13 +177,13 @@ export default function TerminalBreakingNews({
           <p style={{ margin: '0 0 8px', fontSize: 11, color: '#f59e0b' }}>Electron required for headline fetch.</p>
         )}
         {isElectron && !hasFmpKey && !externalHeadlines && (
-          <p style={{ margin: 0, fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--tp-text-muted)', lineHeight: 1.5 }}>
             Add an FMP key in Settings to populate headlines. This panel accepts a live{' '}
             <code style={{ fontSize: 11, color: '#818cf8' }}>headlines</code> feed when you wire streaming data.
           </p>
         )}
         {error && !items.length && (
-          <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>{error}</p>
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--tp-text-muted)' }}>{error}</p>
         )}
         {items.length > 0 && (
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -198,7 +198,7 @@ export default function TerminalBreakingNews({
                   fontSize: 12,
                   padding: '8px 10px',
                   borderRadius: 8,
-                  background: '#060b16',
+                  background: 'var(--tp-bg-input)',
                   border: '1px solid #121826',
                 }}
               >
@@ -222,7 +222,7 @@ export default function TerminalBreakingNews({
                       {item.ticker}
                     </button>
                   ) : (
-                    <span style={{ fontSize: 10, color: '#475569' }}>MKT</span>
+                    <span style={{ fontSize: 10, color: 'var(--tp-text-faint)' }}>MKT</span>
                   )}
                   <span style={{ fontSize: 9, fontWeight: 700, color: sentimentColor(item.sentiment) }}>
                     {item.sentiment}
@@ -235,7 +235,7 @@ export default function TerminalBreakingNews({
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{
-                        color: '#e2e8f0',
+                        color: 'var(--tp-text)',
                         fontWeight: 600,
                         textDecoration: 'none',
                         lineHeight: 1.45,
@@ -245,13 +245,13 @@ export default function TerminalBreakingNews({
                       {item.title}
                     </a>
                   ) : (
-                    <span style={{ color: '#e2e8f0', fontWeight: 600, lineHeight: 1.45 }}>{item.title}</span>
+                    <span style={{ color: 'var(--tp-text)', fontWeight: 600, lineHeight: 1.45 }}>{item.title}</span>
                   )}
                   {item.site && (
-                    <span style={{ display: 'block', marginTop: 4, fontSize: 10, color: '#475569' }}>{item.site}</span>
+                    <span style={{ display: 'block', marginTop: 4, fontSize: 10, color: 'var(--tp-text-faint)' }}>{item.site}</span>
                   )}
                 </div>
-                <span style={{ fontSize: 10, color: '#64748b', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 10, color: 'var(--tp-text-muted)', whiteSpace: 'nowrap' }}>
                   {formatHeadlineTime(item.publishedAt)}
                 </span>
               </li>
@@ -259,7 +259,7 @@ export default function TerminalBreakingNews({
           </ul>
         )}
         {lastUpdated && items.length > 0 && (
-          <div style={{ marginTop: 8, fontSize: 10, color: '#334155' }}>
+          <div style={{ marginTop: 8, fontSize: 10, color: 'var(--tp-text-dim)' }}>
             Updated {new Date(lastUpdated).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
             {!externalHeadlines && hasFmpKey ? ' · auto-refresh 5m' : ''}
           </div>
@@ -274,8 +274,8 @@ const headerBtn = {
   fontWeight: 600,
   padding: '4px 8px',
   borderRadius: 6,
-  border: '1px solid #1a2035',
-  background: '#060b16',
+  border: '1px solid var(--tp-border)',
+  background: 'var(--tp-bg-input)',
   color: '#818cf8',
   cursor: 'pointer',
 };

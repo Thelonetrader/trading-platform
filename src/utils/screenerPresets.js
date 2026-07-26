@@ -2,6 +2,12 @@ import { readJson } from './storageStats';
 
 const STORAGE_KEY = 'screenerPresets';
 
+export {
+  DEFAULT_SCREENER_FILTERS,
+  loadScreenerLiveFilters,
+  saveScreenerLiveFilters,
+} from './screenerConfig';
+
 export function listScreenerPresets() {
   return readJson(STORAGE_KEY, []);
 }
@@ -31,23 +37,3 @@ export function deleteScreenerPreset(id) {
   const next = listScreenerPresets().filter((p) => p.id !== id);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
 }
-
-export const DEFAULT_SCREENER_FILTERS = {
-  priorityFilter: { High: true, Medium: true, Low: true },
-  sectorQuery: '',
-  ratingFilter: 'hold+',
-  requireScorecard: false,
-  journalFilter: 'any',
-  minChange: '',
-  maxChange: '',
-  sortBy: 'priority',
-  search: '',
-  tagQuery: '',
-  minRank: '',
-  universeId: 'watchlist',
-  customUniverse: '',
-  minPe: '',
-  maxPe: '',
-  minEpsGrowth: '',
-  minFcfYield: '',
-};

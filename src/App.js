@@ -33,6 +33,7 @@ import {
   reconcilePlaceholderWatchlistEntries,
   resolveAndPatchWatchlist,
 } from './utils/watchlistAutoFill';
+import { useTheme } from './theme/ThemeContext';
 
 function App() {
   const [activePage, setActivePage] = useState('terminal');
@@ -49,6 +50,8 @@ function App() {
   const [scorecardLiveTicker, setScorecardLiveTicker] = useState('');
   const [screenerExtraTickers, setScreenerExtraTickers] = useState([]);
   const [scannerExtraEntries, setScannerExtraEntries] = useState([]);
+  const [chartScannerVisited, setChartScannerVisited] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   const {
     connection,
@@ -68,7 +71,7 @@ function App() {
     isElectron,
   } = useTradingApi();
 
-  const { testFmp, config: marketConfig, fetchNews, fetchScreenerSnapshots } = useMarketData();
+  const { testFmp, config: marketConfig, fetchNews, fetchScreenerSnapshots, searchSymbols, fetchCompanyScreener } = useMarketData();
   const {
     config: agentConfig,
     activeProfile,
@@ -129,7 +132,7 @@ function App() {
 
   useEffect(() => {
     if (activePage !== 'screener') setScreenerExtraTickers([]);
-    if (activePage !== 'chartscanner') setScannerExtraEntries([]);
+    if (activePage === 'chartscanner') setChartScannerVisited(true);
   }, [activePage]);
 
   useEffect(() => {
@@ -159,7 +162,7 @@ function App() {
       extraTickers: [
         ...(scorecardLiveTicker ? [scorecardLiveTicker] : []),
         ...screenerExtraTickers,
-        ...scannerExtraEntries,
+        ...(activePage === 'chartscanner' ? scannerExtraEntries : []),
       ],
     });
     if (syms.length) subscribeSymbols(syms);
@@ -167,6 +170,7 @@ function App() {
     connection.status,
     activeSymbol,
     activeContract,
+    activePage,
     subscribeSymbols,
     portfolioSubTick,
     scorecardLiveTicker,
@@ -258,8 +262,8 @@ function App() {
       style={{
         display: 'flex',
         height: '100vh',
-        background: '#060b16',
-        color: '#e2e8f0',
+        background: 'var(--tp-bg-app)',
+        color: 'var(--tp-text)',
         fontFamily: "'Inter', system-ui, sans-serif",
         overflow: 'hidden',
       }}
@@ -267,18 +271,18 @@ function App() {
       <div
         style={{
           width: 220,
-          background: '#0a0f1e',
-          borderRight: '1px solid #1a2035',
+          background: 'var(--tp-bg-panel)',
+          borderRight: '1px solid var(--tp-border)',
           display: 'flex',
           flexDirection: 'column',
           flexShrink: 0,
         }}
       >
-        <div style={{ padding: '24px 20px 20px', borderBottom: '1px solid #1a2035' }}>
-          <div style={{ fontSize: 11, letterSpacing: '0.2em', color: '#334155', textTransform: 'uppercase', marginBottom: 4 }}>
+        <div style={{ padding: '24px 20px 20px', borderBottom: '1px solid var(--tp-border)' }}>
+          <div style={{ fontSize: 11, letterSpacing: '0.2em', color: 'var(--tp-text-dim)', textTransform: 'uppercase', marginBottom: 4 }}>
             The Lone Trader
           </div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--tp-text-strong)', letterSpacing: '-0.02em' }}>
             Trading Platform
           </div>
         </div>
@@ -295,10 +299,10 @@ function App() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 10,
-                background: activePage === item.id ? '#1a2035' : 'transparent',
+                background: activePage === item.id ? 'var(--tp-bg-active)' : 'transparent',
                 border: 'none',
-                borderLeft: activePage === item.id ? '2px solid #6366f1' : '2px solid transparent',
-                color: activePage === item.id ? '#f1f5f9' : '#475569',
+                borderLeft: activePage === item.id ? '2px solid var(--tp-accent)' : '2px solid transparent',
+                color: activePage === item.id ? 'var(--tp-text-title)' : 'var(--tp-text-faint)',
                 fontSize: 13,
                 fontWeight: activePage === item.id ? 600 : 400,
                 cursor: 'pointer',
@@ -311,7 +315,7 @@ function App() {
           ))}
         </nav>
 
-        <div style={{ padding: '16px 20px', borderTop: '1px solid #1a2035', fontSize: 11, color: '#1e293b' }}>
+        <div style={{ padding: '16px 20px', borderTop: '1px solid var(--tp-border)', fontSize: 11, color: 'var(--tp-text-foot)' }}>
           v0.2.1 · ⌘K command
         </div>
       </div>
@@ -320,8 +324,8 @@ function App() {
         <div
           style={{
             height: 56,
-            background: '#0a0f1e',
-            borderBottom: '1px solid #1a2035',
+            background: 'var(--tp-bg-panel)',
+            borderBottom: '1px solid var(--tp-border)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -329,7 +333,7 @@ function App() {
             flexShrink: 0,
           }}
         >
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9' }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--tp-text-title)' }}>
             {navItems.find((n) => n.id === activePage)?.label}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
@@ -344,9 +348,9 @@ function App() {
               onClick={() => setCommandOpen(true)}
               style={{
                 fontSize: 12,
-                color: '#64748b',
-                background: '#060b16',
-                border: '1px solid #1a2035',
+                color: 'var(--tp-text-muted)',
+                background: 'var(--tp-bg-input)',
+                border: '1px solid var(--tp-border)',
                 borderRadius: 6,
                 padding: '4px 10px',
                 cursor: 'pointer',
@@ -354,7 +358,24 @@ function App() {
             >
               ⌘K
             </button>
-            <div style={{ fontSize: 12, color: '#334155' }}>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              style={{
+                fontSize: 12,
+                color: 'var(--tp-text-muted)',
+                background: 'var(--tp-bg-input)',
+                border: '1px solid var(--tp-border)',
+                borderRadius: 6,
+                padding: '4px 10px',
+                cursor: 'pointer',
+              }}
+            >
+              {theme === 'dark' ? '☀ Light' : '☾ Dark'}
+            </button>
+            <div style={{ fontSize: 12, color: 'var(--tp-text-dim)' }}>
               {new Date().toLocaleDateString('en-GB', {
                 weekday: 'long',
                 year: 'numeric',
@@ -496,18 +517,32 @@ function App() {
               }}
               hasFmpKey={hasFmpKey}
               fetchScreenerSnapshots={fetchScreenerSnapshots}
+              searchSymbols={searchSymbols}
+              fetchCompanyScreener={fetchCompanyScreener}
               isElectron={isElectron}
             />
           )}
-          {activePage === 'chartscanner' && (
-            <ChartScanner
-              quotes={quotes}
-              connection={connection}
-              fetchHistoricalBars={fetchHistoricalBars}
-              isElectron={isElectron}
-              onOpenTerminal={(sym) => openTerminalForTicker(sym)}
-              onUniverseEntriesChange={setScannerExtraEntries}
-            />
+          {chartScannerVisited && (
+            <div
+              style={{
+                display: activePage === 'chartscanner' ? 'block' : 'none',
+                pointerEvents: activePage === 'chartscanner' ? 'auto' : 'none',
+                visibility: activePage === 'chartscanner' ? 'visible' : 'hidden',
+              }}
+            >
+              <ChartScanner
+                quotes={quotes}
+                connection={connection}
+                fetchHistoricalBars={fetchHistoricalBars}
+                fetchScreenerSnapshots={fetchScreenerSnapshots}
+                hasFmpKey={hasFmpKey}
+                isElectron={isElectron}
+                onOpenTerminal={(sym) => openTerminalForTicker(sym)}
+                onUniverseEntriesChange={setScannerExtraEntries}
+                searchSymbols={searchSymbols}
+                fetchCompanyScreener={fetchCompanyScreener}
+              />
+            </div>
           )}
           {activePage === 'alerts' && (
             <Alerts
@@ -612,10 +647,10 @@ function Dashboard({ onNavigate, portfolioStats, connection, accountSummary = []
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6 }}>
+        <div style={{ fontSize: 11, color: 'var(--tp-text-dim)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 6 }}>
           Welcome back
         </div>
-        <div style={{ fontSize: 24, fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
+        <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--tp-text-strong)', letterSpacing: '-0.02em' }}>
           Good{' '}
           {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, Luke
         </div>
@@ -633,23 +668,23 @@ function Dashboard({ onNavigate, portfolioStats, connection, accountSummary = []
           <div
             key={stat.label}
             style={{
-              background: '#0a0f1e',
-              border: '1px solid #1a2035',
+              background: 'var(--tp-bg-panel)',
+              border: '1px solid var(--tp-border)',
               borderRadius: 12,
               padding: 20,
             }}
           >
-            <div style={{ fontSize: 11, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
+            <div style={{ fontSize: 11, color: 'var(--tp-text-faint)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
               {stat.label}
             </div>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#f1f5f9', marginBottom: 4 }}>{stat.value}</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--tp-text-title)', marginBottom: 4 }}>{stat.value}</div>
             <div style={{ fontSize: 12, color: stat.positive ? '#22c55e' : '#ef4444' }}>{stat.change}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ background: '#0a0f1e', border: '1px solid #1a2035', borderRadius: 12, padding: 20 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#f1f5f9', marginBottom: 16 }}>Quick Actions</div>
+      <div style={{ background: 'var(--tp-bg-panel)', border: '1px solid var(--tp-border)', borderRadius: 12, padding: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--tp-text-title)', marginBottom: 16 }}>Quick Actions</div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           {actions.map((action) => (
             <button
@@ -659,9 +694,9 @@ function Dashboard({ onNavigate, portfolioStats, connection, accountSummary = []
               style={{
                 padding: '8px 16px',
                 background: 'transparent',
-                border: '1px solid #1a2035',
+                border: '1px solid var(--tp-border)',
                 borderRadius: 8,
-                color: '#475569',
+                color: 'var(--tp-text-faint)',
                 fontSize: 13,
                 cursor: 'pointer',
               }}
@@ -684,11 +719,11 @@ function ComingSoon({ page }) {
         alignItems: 'center',
         justifyContent: 'center',
         height: '60vh',
-        color: '#334155',
+        color: 'var(--tp-text-dim)',
       }}
     >
       <div style={{ fontSize: 48, marginBottom: 16 }}>◈</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: '#475569', marginBottom: 8 }}>{page}</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--tp-text-faint)', marginBottom: 8 }}>{page}</div>
       <div style={{ fontSize: 14 }}>Coming in the next build</div>
     </div>
   );

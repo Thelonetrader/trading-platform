@@ -69,10 +69,10 @@ export default function ScorecardLibrary({ onOpenScorecard, onOpenTerminal, onOp
   };
 
   const inputStyle = {
-    background: '#060b16',
-    border: '1px solid #1a2035',
+    background: 'var(--tp-bg-input)',
+    border: '1px solid var(--tp-border)',
     borderRadius: 8,
-    color: '#f1f5f9',
+    color: 'var(--tp-text-title)',
     fontSize: 13,
     padding: '8px 12px',
     width: '100%',
@@ -82,7 +82,7 @@ export default function ScorecardLibrary({ onOpenScorecard, onOpenTerminal, onOp
 
   const labelStyle = {
     fontSize: 11,
-    color: '#475569',
+    color: 'var(--tp-text-faint)',
     textTransform: 'uppercase',
     letterSpacing: '0.1em',
     marginBottom: 6,
@@ -93,13 +93,13 @@ export default function ScorecardLibrary({ onOpenScorecard, onOpenTerminal, onOp
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
         <div>
-          <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 4 }}>
+          <div style={{ fontSize: 11, color: 'var(--tp-text-dim)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 4 }}>
             Saved research
           </div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--tp-text-strong)', letterSpacing: '-0.02em' }}>
             Scorecard Library
           </div>
-          <div style={{ fontSize: 13, color: '#64748b', marginTop: 6, maxWidth: 520 }}>
+          <div style={{ fontSize: 13, color: 'var(--tp-text-muted)', marginTop: 6, maxWidth: 520 }}>
             Every evaluation saved from Scorecards. Edit metrics, open Terminal, or remove stale entries.
           </div>
         </div>
@@ -128,8 +128,8 @@ export default function ScorecardLibrary({ onOpenScorecard, onOpenTerminal, onOp
 
       <div
         style={{
-          background: '#0a0f1e',
-          border: '1px solid #1a2035',
+          background: 'var(--tp-bg-panel)',
+          border: '1px solid var(--tp-border)',
           borderRadius: 12,
           padding: 20,
           marginBottom: 20,
@@ -165,19 +165,19 @@ export default function ScorecardLibrary({ onOpenScorecard, onOpenTerminal, onOp
         </div>
       </div>
 
-      <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>
+      <div style={{ fontSize: 13, color: 'var(--tp-text-muted)', marginBottom: 12 }}>
         {filtered.length} saved evaluation{filtered.length === 1 ? '' : 's'}
       </div>
 
       {filtered.length === 0 ? (
         <div
           style={{
-            background: '#0a0f1e',
-            border: '1px dashed #1a2035',
+            background: 'var(--tp-bg-panel)',
+            border: '1px dashed var(--tp-border)',
             borderRadius: 12,
             padding: 48,
             textAlign: 'center',
-            color: '#475569',
+            color: 'var(--tp-text-faint)',
           }}
         >
           {rows.length === 0
@@ -194,8 +194,8 @@ export default function ScorecardLibrary({ onOpenScorecard, onOpenTerminal, onOp
               <div
                 key={entry.id}
                 style={{
-                  background: '#0a0f1e',
-                  border: '1px solid #1a2035',
+                  background: 'var(--tp-bg-panel)',
+                  border: '1px solid var(--tp-border)',
                   borderRadius: 10,
                   padding: '14px 18px',
                   display: 'grid',
@@ -205,18 +205,18 @@ export default function ScorecardLibrary({ onOpenScorecard, onOpenTerminal, onOp
                 }}
               >
                 <div>
-                  <div style={{ fontWeight: 700, color: '#f8fafc', fontSize: 15 }}>{entry.ticker}</div>
+                  <div style={{ fontWeight: 700, color: 'var(--tp-text-strong)', fontSize: 15 }}>{entry.ticker}</div>
                   {entry.displayName && entry.displayName !== entry.ticker && (
-                    <div style={{ fontSize: 12, color: '#64748b' }}>{entry.displayName}</div>
+                    <div style={{ fontSize: 12, color: 'var(--tp-text-muted)' }}>{entry.displayName}</div>
                   )}
                 </div>
-                <div style={{ fontSize: 13, color: '#94a3b8' }}>{sector?.label || entry.sectorId}</div>
+                <div style={{ fontSize: 13, color: 'var(--tp-text-secondary)' }}>{sector?.label || entry.sectorId}</div>
                 <div>
                   <span style={{ fontSize: 14, fontWeight: 700, color }}>{entry.ratingShort}</span>
-                  <span style={{ fontSize: 12, color: '#64748b', marginLeft: 8 }}>{entry.avg.toFixed(2)} / 5</span>
-                  <div style={{ fontSize: 11, color: '#475569' }}>{entry.ratingLabel}</div>
+                  <span style={{ fontSize: 12, color: 'var(--tp-text-muted)', marginLeft: 8 }}>{entry.avg.toFixed(2)} / 5</span>
+                  <div style={{ fontSize: 11, color: 'var(--tp-text-faint)' }}>{entry.ratingLabel}</div>
                 </div>
-                <div style={{ fontSize: 12, color: '#475569' }}>{formatDate(entry.updatedAt)}</div>
+                <div style={{ fontSize: 12, color: 'var(--tp-text-faint)' }}>{formatDate(entry.updatedAt)}</div>
                 <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
                   {onOpenScorecard && (
                     <button
@@ -243,9 +243,9 @@ export default function ScorecardLibrary({ onOpenScorecard, onOpenTerminal, onOp
                       style={{
                         padding: '6px 12px',
                         borderRadius: 6,
-                        border: '1px solid #1a2035',
+                        border: '1px solid var(--tp-border)',
                         background: 'transparent',
-                        color: '#94a3b8',
+                        color: 'var(--tp-text-secondary)',
                         fontSize: 12,
                         fontWeight: 600,
                         cursor: 'pointer',

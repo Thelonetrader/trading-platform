@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { displayChangePct, displayPrice } from '../utils/quoteDisplay';
+import { formatSecType, formatSectorDisplay } from '../utils/sectorDisplay';
 
 function fmtPrice(n, currency = 'USD') {
   if (n == null || Number.isNaN(Number(n)) || Number(n) <= 0) return '—';
@@ -22,10 +23,10 @@ function fmtSpread(bid, ask) {
 function InfoRow({ label, value, mono }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 11, lineHeight: 1.5 }}>
-      <span style={{ color: '#64748b', flexShrink: 0 }}>{label}</span>
+      <span style={{ color: 'var(--tp-text-muted)', flexShrink: 0 }}>{label}</span>
       <span
         style={{
-          color: value ? '#cbd5e1' : '#475569',
+          color: value ? 'var(--tp-text-title)' : 'var(--tp-text-faint)',
           textAlign: 'right',
           fontFamily: mono ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : 'inherit',
           fontWeight: mono ? 600 : 500,
@@ -40,12 +41,12 @@ function InfoRow({ label, value, mono }) {
 function QuoteCell({ label, value, accent }) {
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
+      <div style={{ fontSize: 9, color: 'var(--tp-text-faint)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
       <div
         style={{
           fontSize: 13,
           fontWeight: 700,
-          color: accent || '#e2e8f0',
+          color: accent || 'var(--tp-text-title)',
           fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
           marginTop: 2,
         }}
@@ -62,6 +63,7 @@ export default function OrderTicket({
   currency,
   primaryExch,
   listingExchange,
+  watchSector,
   quote,
   securityName,
   connection,
@@ -124,6 +126,10 @@ export default function OrderTicket({
   }, [routeExchange, listingExchange, instrument]);
 
   const displayName = securityName || instrument?.companyName || null;
+  const sectorLabel = useMemo(
+    () => formatSectorDisplay(instrument?.sector || watchSector),
+    [instrument?.sector, watchSector],
+  );
   const last = displayPrice(quote);
   const chg = displayChangePct(quote);
   const bid = quote?.bid > 0 ? quote.bid : null;
@@ -194,8 +200,8 @@ export default function OrderTicket({
       style={{
         width: 312,
         flexShrink: 0,
-        background: '#0a0f1e',
-        border: '1px solid #1a2035',
+        background: 'var(--tp-bg-panel)',
+        border: '1px solid var(--tp-border)',
         borderRadius: 12,
         display: 'flex',
         flexDirection: 'column',
@@ -205,12 +211,12 @@ export default function OrderTicket({
       <div
         style={{
           padding: '14px 16px',
-          borderBottom: '1px solid #1a2035',
-          background: 'linear-gradient(180deg, #0f1629 0%, #0a0f1e 100%)',
+          borderBottom: '1px solid var(--tp-border)',
+          background: 'var(--tp-panel-header-gradient)',
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.14em' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--tp-text-secondary)', letterSpacing: '0.14em' }}>
             ORDER TICKET
           </span>
           <span
@@ -227,7 +233,7 @@ export default function OrderTicket({
             {mode.toUpperCase()}
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 11, color: '#64748b' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 11, color: 'var(--tp-text-muted)' }}>
           <span
             style={{
               width: 7,
@@ -242,15 +248,15 @@ export default function OrderTicket({
         </div>
       </div>
 
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid #1a2035', display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ fontSize: 26, fontWeight: 800, color: '#f8fafc', letterSpacing: '0.02em' }}>{symbol || '—'}</div>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--tp-border)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--tp-text-strong)', letterSpacing: '0.02em' }}>{symbol || '—'}</div>
         {displayName && (
-          <div style={{ fontSize: 13, color: '#94a3b8', lineHeight: 1.35 }} title={displayName}>
+          <div style={{ fontSize: 13, color: 'var(--tp-text-secondary)', lineHeight: 1.35 }} title={displayName}>
             {displayName.length > 42 ? `${displayName.slice(0, 41)}…` : displayName}
           </div>
         )}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-          <Tag>STK</Tag>
+          {sectorLabel ? <Tag accent>{sectorLabel}</Tag> : null}
           <Tag>{ccy}</Tag>
           {listingExchangeResolved && <Tag accent>Listed {listingExchangeResolved}</Tag>}
           <Tag muted>Route {routeExchange}</Tag>
@@ -258,21 +264,21 @@ export default function OrderTicket({
       </div>
 
       {symbol && (
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid #1a2035', background: '#060b16' }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--tp-border)', background: 'var(--tp-bg-input)' }}>
           <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
-            <QuoteCell label="Last" value={fmtPrice(last, ccy)} accent={chgUp ? '#22c55e' : chg != null ? '#ef4444' : '#e2e8f0'} />
+            <QuoteCell label="Last" value={fmtPrice(last, ccy)} accent={chgUp ? '#22c55e' : chg != null ? '#ef4444' : undefined} />
             <QuoteCell label="Bid" value={fmtPrice(bid, ccy)} />
             <QuoteCell label="Ask" value={fmtPrice(ask, ccy)} />
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
             <span style={{ color: chgUp ? '#22c55e' : '#ef4444' }}>{fmtPct(chg)}</span>
-            <span style={{ color: '#64748b' }}>
+            <span style={{ color: 'var(--tp-text-muted)' }}>
               Spread {fmtSpread(bid, ask)}
               {quote?.close > 0 ? ` · Prior ${fmtPrice(quote.close, ccy)}` : ''}
             </span>
           </div>
           {!connected && (
-            <div style={{ marginTop: 8, fontSize: 11, color: '#64748b' }}>Connect IB for live bid/ask.</div>
+            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--tp-text-muted)' }}>Connect IB for live bid/ask.</div>
           )}
         </div>
       )}
@@ -282,15 +288,16 @@ export default function OrderTicket({
           style={{
             padding: 10,
             borderRadius: 8,
-            background: '#060b16',
-            border: '1px solid #1a2035',
+            background: 'var(--tp-bg-input)',
+            border: '1px solid var(--tp-border)',
             display: 'flex',
             flexDirection: 'column',
             gap: 6,
           }}
         >
           <InfoRow label="Account" value={accountId || 'Default (managed)'} mono />
-          <InfoRow label="Sec type" value="STK" />
+          <InfoRow label="Sec type" value={formatSecType('STK')} />
+          {sectorLabel ? <InfoRow label="Sector" value={sectorLabel} /> : null}
           <InfoRow label="Currency" value={ccy} />
           <InfoRow label="Listing" value={listingExchangeResolved || (routeExchange !== 'SMART' ? routeExchange : 'Add FMP key or set Watchlist exchange')} />
           {primaryExch && routeExchange === 'SMART' && <InfoRow label="Primary" value={primaryExch} mono />}
@@ -309,14 +316,14 @@ export default function OrderTicket({
               style={{
                 flex: 1,
                 padding: '9px 0',
-                border: side === s ? 'none' : '1px solid #1a2035',
+                border: side === s ? 'none' : '1px solid var(--tp-border)',
                 borderRadius: 8,
                 cursor: 'pointer',
                 fontWeight: 700,
                 fontSize: 12,
                 letterSpacing: '0.06em',
                 background: side === s ? (s === 'BUY' ? '#166534' : '#991b1b') : 'transparent',
-                color: side === s ? '#fff' : '#64748b',
+                color: side === s ? '#fff' : 'var(--tp-text-muted)',
               }}
             >
               {s}
@@ -406,13 +413,13 @@ export default function OrderTicket({
         </label>
 
         {estNotional != null && (
-          <div style={{ fontSize: 11, color: '#64748b' }}>
+          <div style={{ fontSize: 11, color: 'var(--tp-text-muted)' }}>
             Est. notional{' '}
-            <span style={{ color: '#e2e8f0', fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>
+            <span style={{ color: 'var(--tp-text)', fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>
               {fmtPrice(estNotional, ccy)}
             </span>
             {refPrice != null && (
-              <span style={{ color: '#475569' }}> @ {Number(refPrice).toFixed(2)}</span>
+              <span style={{ color: 'var(--tp-text-faint)' }}> @ {Number(refPrice).toFixed(2)}</span>
             )}
           </div>
         )}
@@ -425,11 +432,11 @@ export default function OrderTicket({
               border: '1px solid #6366f1',
               background: '#6366f112',
               fontSize: 12,
-              color: '#e2e8f0',
+              color: 'var(--tp-text)',
               lineHeight: 1.55,
             }}
           >
-            <div style={{ fontSize: 10, color: '#818cf8', fontWeight: 700, letterSpacing: '0.08em', marginBottom: 6 }}>
+            <div style={{ fontSize: 10, color: 'var(--tp-accent-muted)', fontWeight: 700, letterSpacing: '0.08em', marginBottom: 6 }}>
               ORDER PREVIEW
             </div>
             {side} {qty} {symbol} · {orderTypeLabel}
@@ -475,7 +482,7 @@ export default function OrderTicket({
               padding: '6px 0',
               border: 'none',
               background: 'transparent',
-              color: '#64748b',
+              color: 'var(--tp-text-muted)',
               cursor: 'pointer',
               fontSize: 12,
             }}
@@ -497,9 +504,9 @@ function Tag({ children, accent, muted }) {
         letterSpacing: '0.06em',
         padding: '3px 7px',
         borderRadius: 4,
-        background: accent ? '#6366f122' : muted ? '#1a2035' : '#1e293b',
-        color: accent ? '#a5b4fc' : muted ? '#64748b' : '#94a3b8',
-        border: accent ? '1px solid #6366f144' : '1px solid #1a2035',
+        background: accent ? 'var(--tp-accent-soft)' : muted ? 'var(--tp-bg-inset)' : 'var(--tp-bg-active)',
+        color: accent ? 'var(--tp-accent)' : muted ? 'var(--tp-text-muted)' : 'var(--tp-text-title)',
+        border: accent ? '1px solid var(--tp-accent-border)' : '1px solid var(--tp-border)',
       }}
     >
       {children}
@@ -507,16 +514,16 @@ function Tag({ children, accent, muted }) {
   );
 }
 
-const labelStyle = { fontSize: 11, color: '#64748b', display: 'block' };
+const labelStyle = { fontSize: 11, color: 'var(--tp-text-muted)', display: 'block' };
 
 const fieldStyle = {
   display: 'block',
   width: '100%',
   marginTop: 4,
-  background: '#060b16',
-  border: '1px solid #1a2035',
+  background: 'var(--tp-bg-input)',
+  border: '1px solid var(--tp-border)',
   borderRadius: 8,
-  color: '#f1f5f9',
+  color: 'var(--tp-text-title)',
   fontSize: 13,
   padding: '8px 10px',
   boxSizing: 'border-box',
@@ -528,8 +535,8 @@ const chipBtn = {
   fontSize: 10,
   fontWeight: 600,
   borderRadius: 6,
-  border: '1px solid #1a2035',
-  background: '#0a0f1e',
-  color: '#818cf8',
+  border: '1px solid var(--tp-border)',
+  background: 'var(--tp-bg-panel)',
+  color: 'var(--tp-accent-muted)',
   cursor: 'pointer',
 };

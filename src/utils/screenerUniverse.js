@@ -27,7 +27,7 @@ export function parseCustomUniverse(text) {
   return out;
 }
 
-export function resolveUniverseTickers(universeId, customUniverse = '') {
+export function resolveUniverseTickers(universeId, customUniverse = '', extraTickers = []) {
   const watchlist = readJson('watchlist', []);
   const portfolio = readJson('portfolio', []);
   const evals = listScorecardEvals();
@@ -39,6 +39,14 @@ export function resolveUniverseTickers(universeId, customUniverse = '') {
   };
 
   switch (universeId) {
+    case 'global':
+      watchlist.forEach((w) => add(w.ticker));
+      portfolio.forEach((h) => add(h.ticker));
+      evals.forEach((e) => add(e.ticker));
+      (STATIC_LISTS.mag7 || []).forEach(add);
+      (STATIC_LISTS.dow30 || []).forEach(add);
+      (STATIC_LISTS.sp50 || []).forEach(add);
+      break;
     case 'library':
       evals.forEach((e) => add(e.ticker));
       break;
@@ -64,6 +72,10 @@ export function resolveUniverseTickers(universeId, customUniverse = '') {
       break;
   }
 
+  for (const t of extraTickers || []) {
+    add(t);
+  }
+
   return [...tickers].sort();
 }
 
@@ -80,7 +92,7 @@ function sectorFromWatchlistLabel(sectorText) {
 }
 
 /** Build screener rows for any resolved universe (merges watchlist metadata when present). */
-export function buildUniverseRows(tickers, journalIndex, weights = getRankWeights()) {
+export function buildUniverseRows(tickers, journalIndex, weights = getRankWeights(), nameByTicker = {}) {
   const watchlist = readJson('watchlist', []);
   const watchByTicker = new Map(
     watchlist.map((w) => [(w.ticker || '').trim().toUpperCase(), w]),
@@ -88,10 +100,11 @@ export function buildUniverseRows(tickers, journalIndex, weights = getRankWeight
 
   return tickers.map((ticker) => {
     const item = watchByTicker.get(ticker);
+    const pickedName = nameByTicker[ticker] || nameByTicker[ticker?.toUpperCase?.()] || '';
     const base = item || {
       id: `uni-${ticker}`,
       ticker,
-      name: '',
+      name: pickedName,
       sector: '',
       priority: 'Medium',
       exchange: 'SMART',

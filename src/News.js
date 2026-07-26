@@ -77,10 +77,10 @@ export default function News({ onOpenTerminal }) {
   }, [items]);
 
   const inputStyle = {
-    background: '#060b16',
-    border: '1px solid #1a2035',
+    background: 'var(--tp-bg-input)',
+    border: '1px solid var(--tp-border)',
     borderRadius: 8,
-    color: '#f1f5f9',
+    color: 'var(--tp-text-title)',
     fontSize: 13,
     padding: '8px 12px',
     width: '100%',
@@ -91,11 +91,11 @@ export default function News({ onOpenTerminal }) {
   return (
     <div>
       <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 4 }}>
+        <div style={{ fontSize: 11, color: 'var(--tp-text-dim)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 4 }}>
           Phase 2 · FMP
         </div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: '#f8fafc' }}>News & sentiment</div>
-        <p style={{ fontSize: 13, color: '#64748b', marginTop: 8, maxWidth: 560, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--tp-text-strong)' }}>News & sentiment</div>
+        <p style={{ fontSize: 13, color: 'var(--tp-text-muted)', marginTop: 8, maxWidth: 560, lineHeight: 1.5 }}>
           Headlines from Financial Modeling Prep with lexicon-based sentiment (bullish / bearish / neutral). Requires a
           free or paid{' '}
           <a href="https://site.financialmodelingprep.com/developer/docs" style={{ color: '#818cf8' }}>
@@ -115,14 +115,14 @@ export default function News({ onOpenTerminal }) {
           gap: 12,
           alignItems: 'flex-end',
           marginBottom: 20,
-          background: '#0a0f1e',
-          border: '1px solid #1a2035',
+          background: 'var(--tp-bg-panel)',
+          border: '1px solid var(--tp-border)',
           borderRadius: 12,
           padding: 16,
         }}
       >
         <div>
-          <div style={{ fontSize: 11, color: '#475569', marginBottom: 6, textTransform: 'uppercase' }}>Universe</div>
+          <div style={{ fontSize: 11, color: 'var(--tp-text-faint)', marginBottom: 6, textTransform: 'uppercase' }}>Universe</div>
           <select style={{ ...inputStyle, width: 'auto', minWidth: 160 }} value={scope} onChange={(e) => setScope(e.target.value)}>
             <option value="watchlist">Watchlist</option>
             <option value="combined">Watchlist + portfolio</option>
@@ -131,12 +131,12 @@ export default function News({ onOpenTerminal }) {
         </div>
         {scope === 'single' && (
           <div style={{ flex: '1 1 120px', maxWidth: 140 }}>
-            <div style={{ fontSize: 11, color: '#475569', marginBottom: 6 }}>Ticker</div>
+            <div style={{ fontSize: 11, color: 'var(--tp-text-faint)', marginBottom: 6 }}>Ticker</div>
             <input style={inputStyle} value={ticker} onChange={(e) => setTicker(e.target.value.toUpperCase())} placeholder="AAPL" />
           </div>
         )}
         <div>
-          <div style={{ fontSize: 11, color: '#475569', marginBottom: 6 }}>Sentiment</div>
+          <div style={{ fontSize: 11, color: 'var(--tp-text-faint)', marginBottom: 6 }}>Sentiment</div>
           <select
             style={{ ...inputStyle, width: 'auto' }}
             value={sentimentFilter}
@@ -167,12 +167,12 @@ export default function News({ onOpenTerminal }) {
       </div>
 
       {items.length > 0 && (
-        <div style={{ display: 'flex', gap: 16, marginBottom: 16, fontSize: 13, color: '#94a3b8' }}>
+        <div style={{ display: 'flex', gap: 16, marginBottom: 16, fontSize: 13, color: 'var(--tp-text-secondary)' }}>
           <span>
             <span style={{ color: '#22c55e', fontWeight: 700 }}>{summary.Bullish}</span> bullish
           </span>
           <span>
-            <span style={{ color: '#94a3b8', fontWeight: 700 }}>{summary.Neutral}</span> neutral
+            <span style={{ color: 'var(--tp-text-secondary)', fontWeight: 700 }}>{summary.Neutral}</span> neutral
           </span>
           <span>
             <span style={{ color: '#ef4444', fontWeight: 700 }}>{summary.Bearish}</span> bearish
@@ -180,16 +180,16 @@ export default function News({ onOpenTerminal }) {
         </div>
       )}
 
-      {error && <div style={{ fontSize: 13, color: '#94a3b8', marginBottom: 16 }}>{error}</div>}
+      {error && <div style={{ fontSize: 13, color: 'var(--tp-text-secondary)', marginBottom: 16 }}>{error}</div>}
 
       {earnings.length > 0 && (
-        <div style={{ background: '#0a0f1e', border: '1px solid #1a2035', borderRadius: 12, padding: 16, marginBottom: 20 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#f1f5f9', marginBottom: 12 }}>Upcoming earnings (universe)</div>
+        <div style={{ background: 'var(--tp-bg-panel)', border: '1px solid var(--tp-border)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--tp-text-title)', marginBottom: 12 }}>Upcoming earnings (universe)</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {earnings.slice(0, 12).map((e) => (
               <div key={`${e.symbol}-${e.date}`} style={{ display: 'flex', gap: 12, fontSize: 13, color: '#cbd5e1' }}>
                 <span style={{ fontWeight: 700, color: '#818cf8', width: 56 }}>{e.symbol}</span>
-                <span style={{ color: '#64748b', width: 100 }}>{e.date}</span>
+                <span style={{ color: 'var(--tp-text-muted)', width: 100 }}>{e.date}</span>
                 <span>EPS est. {e.epsEstimate ?? '—'}</span>
               </div>
             ))}
@@ -202,8 +202,8 @@ export default function News({ onOpenTerminal }) {
           <article
             key={item.id}
             style={{
-              background: '#0a0f1e',
-              border: '1px solid #1a2035',
+              background: 'var(--tp-bg-panel)',
+              border: '1px solid var(--tp-border)',
               borderRadius: 10,
               padding: '14px 18px',
             }}
@@ -228,26 +228,26 @@ export default function News({ onOpenTerminal }) {
                 </button>
               )}
               <span style={{ fontSize: 11, fontWeight: 600, color: sentimentColor(item.sentiment) }}>{item.sentiment}</span>
-              <span style={{ fontSize: 11, color: '#475569' }}>{item.publishedAt}</span>
-              {item.site && <span style={{ fontSize: 11, color: '#334155' }}>{item.site}</span>}
+              <span style={{ fontSize: 11, color: 'var(--tp-text-faint)' }}>{item.publishedAt}</span>
+              {item.site && <span style={{ fontSize: 11, color: 'var(--tp-text-dim)' }}>{item.site}</span>}
             </div>
             <a
               href={item.url}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ fontSize: 15, fontWeight: 600, color: '#f1f5f9', textDecoration: 'none', lineHeight: 1.4 }}
+              style={{ fontSize: 15, fontWeight: 600, color: 'var(--tp-text-title)', textDecoration: 'none', lineHeight: 1.4 }}
             >
               {item.title}
             </a>
             {item.text && (
-              <p style={{ margin: '10px 0 0', fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>
+              <p style={{ margin: '10px 0 0', fontSize: 13, color: 'var(--tp-text-muted)', lineHeight: 1.5 }}>
                 {item.text.length > 280 ? `${item.text.slice(0, 280)}…` : item.text}
               </p>
             )}
           </article>
         ))}
         {!loading && !filtered.length && !error && (
-          <div style={{ textAlign: 'center', color: '#475569', padding: 40 }}>No headlines for this filter.</div>
+          <div style={{ textAlign: 'center', color: 'var(--tp-text-faint)', padding: 40 }}>No headlines for this filter.</div>
         )}
       </div>
     </div>

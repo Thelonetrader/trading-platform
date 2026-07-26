@@ -14,7 +14,7 @@ export default function AccountStrip({ connection, accountSummary, onRefresh, re
           alignItems: 'center',
           gap: 12,
           fontSize: 12,
-          color: '#475569',
+          color: 'var(--tp-text-faint)',
         }}
       >
         <span>Account — connect IB in Settings</span>
@@ -46,8 +46,8 @@ export default function AccountStrip({ connection, accountSummary, onRefresh, re
       </span>
       {items.map((item) => (
         <div key={item.label} style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-          <span style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase' }}>{item.label}</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>{item.value}</span>
+          <span style={{ fontSize: 10, color: 'var(--tp-text-faint)', textTransform: 'uppercase' }}>{item.label}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--tp-text)' }}>{item.value}</span>
         </div>
       ))}
       {onRefresh && (
@@ -59,9 +59,9 @@ export default function AccountStrip({ connection, accountSummary, onRefresh, re
             fontSize: 11,
             padding: '4px 10px',
             borderRadius: 6,
-            border: '1px solid #1a2035',
+            border: '1px solid var(--tp-border)',
             background: 'transparent',
-            color: '#64748b',
+            color: 'var(--tp-text-muted)',
             cursor: refreshing ? 'default' : 'pointer',
           }}
         >

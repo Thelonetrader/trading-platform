@@ -35,7 +35,7 @@ const METRIC_DEFS = [
 function MetricCell({ label, value }) {
   return (
     <div style={{ minWidth: 72 }}>
-      <div style={{ fontSize: 10, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+      <div style={{ fontSize: 10, color: 'var(--tp-text-faint)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         {label}
       </div>
       <div style={{ fontSize: 14, fontWeight: 700, color: value ? '#e2e8f0' : '#334155', marginTop: 2 }}>
@@ -97,8 +97,8 @@ export default function TerminalKeyMetrics({ symbol, exchange, currency, fetchFu
   return (
     <div
       style={{
-        background: '#060b16',
-        border: '1px solid #1a2035',
+        background: 'var(--tp-bg-input)',
+        border: '1px solid var(--tp-border)',
         borderRadius: 10,
         padding: '12px 16px',
         display: 'flex',
@@ -110,9 +110,9 @@ export default function TerminalKeyMetrics({ symbol, exchange, currency, fetchFu
         <div style={{ fontSize: 11, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
           Key metrics
         </div>
-        {loading && <span style={{ fontSize: 11, color: '#64748b' }}>Loading…</span>}
+        {loading && <span style={{ fontSize: 11, color: 'var(--tp-text-muted)' }}>Loading…</span>}
         {!loading && sources && (
-          <span style={{ fontSize: 10, color: '#475569' }}>{sources}</span>
+          <span style={{ fontSize: 10, color: 'var(--tp-text-faint)' }}>{sources}</span>
         )}
       </div>
 
@@ -123,7 +123,7 @@ export default function TerminalKeyMetrics({ symbol, exchange, currency, fetchFu
           ))}
         </div>
       ) : (
-        <p style={{ margin: 0, fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>
+        <p style={{ margin: 0, fontSize: 12, color: 'var(--tp-text-muted)', lineHeight: 1.5 }}>
           {loading
             ? 'Fetching ratios…'
             : showHint

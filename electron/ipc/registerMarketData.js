@@ -31,6 +31,14 @@ function registerMarketDataIpc(broker) {
   ipcMain.handle('marketData:getScreenerSnapshots', async (_e, tickers) =>
     service.getScreenerSnapshots(tickers || []),
   );
+
+  ipcMain.handle('marketData:searchSymbols', async (_e, query, opts) =>
+    service.searchSymbols(query, opts || {}),
+  );
+
+  ipcMain.handle('marketData:companyScreener', async (_e, params) =>
+    service.companyScreener(params || {}),
+  );
 }
 
 module.exports = { registerMarketDataIpc };

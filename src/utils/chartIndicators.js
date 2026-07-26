@@ -5,6 +5,11 @@ export function barCloses(bars) {
   return bars.map((b) => Number(b.close)).filter((c) => Number.isFinite(c));
 }
 
+export function barVolumes(bars) {
+  if (!bars?.length) return [];
+  return bars.map((b) => Number(b.volume) || 0);
+}
+
 export function sma(values, period) {
   const p = Math.max(1, period);
   const out = new Array(values.length).fill(null);
@@ -106,4 +111,43 @@ export function prevValid(series, fromIndex) {
     if (series[i] != null && Number.isFinite(series[i])) return { index: i, value: series[i] };
   }
   return { index: -1, value: null };
+}
+
+export function bollingerBands(values, period = 20, mult = 2) {
+  const mid = sma(values, period);
+  const upper = new Array(values.length).fill(null);
+  const lower = new Array(values.length).fill(null);
+  for (let i = period - 1; i < values.length; i++) {
+    if (mid[i] == null) continue;
+    let sumSq = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      const d = values[j] - mid[i];
+      sumSq += d * d;
+    }
+    const sd = Math.sqrt(sumSq / period);
+    upper[i] = mid[i] + mult * sd;
+    lower[i] = mid[i] - mult * sd;
+  }
+  return { mid, upper, lower };
+}
+
+/** Wilder-style ATR on OHLC bars. */
+export function atr(bars, period = 14) {
+  const out = new Array(bars.length).fill(null);
+  if (bars.length < period + 1) return out;
+  const trs = [];
+  for (let i = 0; i < bars.length; i++) {
+    const h = Number(bars[i].high);
+    const l = Number(bars[i].low);
+    const c = Number(bars[i].close);
+    const prevC = i > 0 ? Number(bars[i - 1].close) : c;
+    trs.push(Math.max(h - l, Math.abs(h - prevC), Math.abs(l - prevC)));
+  }
+  let sum = 0;
+  for (let i = 0; i < period; i++) sum += trs[i];
+  out[period - 1] = sum / period;
+  for (let i = period; i < bars.length; i++) {
+    out[i] = (out[i - 1] * (period - 1) + trs[i]) / period;
+  }
+  return out;
 }

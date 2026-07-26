@@ -1,20 +1,9 @@
 import { dispatchWatchlistChanged } from './liveSubscribe';
 import { readJson, writeJson } from './storageStats';
 import { resolveSymbolForTerminal } from './resolveSymbolContract';
+import { formatSectorDisplay } from './sectorDisplay';
 
 const WATCHLIST_KEY = 'watchlist';
-
-const WATCHLIST_SECTORS = [
-  'Consumer Staples',
-  'Technology',
-  'Energy',
-  'Financial Services',
-  'Healthcare',
-  'Real Estate',
-  'Industrials',
-  'Materials',
-  'Utilities',
-];
 
 export function isPlaceholderWatchlistContract(entry) {
   const ex = (entry?.exchange || 'SMART').toUpperCase();
@@ -23,13 +12,7 @@ export function isPlaceholderWatchlistContract(entry) {
 }
 
 function mapSectorForWatchlist(fmpSector) {
-  if (!fmpSector) return '';
-  const raw = String(fmpSector).trim();
-  const lower = raw.toLowerCase();
-  const hit = WATCHLIST_SECTORS.find(
-    (o) => lower.includes(o.toLowerCase()) || o.toLowerCase().includes(lower.split(/[\s/]/)[0]),
-  );
-  return hit || raw;
+  return formatSectorDisplay(fmpSector);
 }
 
 /** Merge FMP/heuristic resolve into a watchlist row without wiping user edits. */

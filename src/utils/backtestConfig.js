@@ -3,11 +3,11 @@ import { readJson } from './storageStats';
 export const BACKTEST_PREFS_KEY = 'chartBacktestPrefs';
 
 export const BACKTEST_BAR_OPTIONS = [
-  { id: '1 day', duration: '1 Y', label: 'Daily · 1 year', maxSymbols: 30, durationKey: '1y' },
-  { id: '1 day', duration: '2 Y', label: 'Daily · 2 years', maxSymbols: 25, durationKey: '2y' },
-  { id: '1 day', duration: '5 Y', label: 'Daily · 5 years', maxSymbols: 20, durationKey: '5y' },
-  { id: '1 hour', duration: '3 M', label: '1 hour · 3 months', maxSymbols: 18, durationKey: '1h_3m' },
-  { id: '1 hour', duration: '6 M', label: '1 hour · 6 months', maxSymbols: 15, durationKey: '1h_6m' },
+  { id: '1 day', duration: '1 Y', label: 'Daily · 1 year', maxSymbols: 120, durationKey: '1y' },
+  { id: '1 day', duration: '2 Y', label: 'Daily · 2 years', maxSymbols: 100, durationKey: '2y' },
+  { id: '1 day', duration: '5 Y', label: 'Daily · 5 years', maxSymbols: 80, durationKey: '5y' },
+  { id: '1 hour', duration: '3 M', label: '1 hour · 3 months', maxSymbols: 70, durationKey: '1h_3m' },
+  { id: '1 hour', duration: '6 M', label: '1 hour · 6 months', maxSymbols: 65, durationKey: '1h_6m' },
 ];
 
 export const DEFAULT_BACKTEST_PREFS = {

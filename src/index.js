@@ -1,14 +1,18 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './theme/tokens.css';
 import './index.css';
 import App from './App';
 import ChartPopoutApp, { isChartPopoutWindow } from './ChartPopoutApp';
 import reportWebVitals from './reportWebVitals';
+import { ThemeProvider } from './theme/ThemeContext';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    {isChartPopoutWindow() ? <ChartPopoutApp /> : <App />}
+    <ThemeProvider>
+      {isChartPopoutWindow() ? <ChartPopoutApp /> : <App />}
+    </ThemeProvider>
   </React.StrictMode>
 );
 

@@ -38,14 +38,14 @@ export default function BacktestResultsPanel({
 
   return (
     <div style={{ marginTop: 28 }}>
-      <div style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc', marginBottom: 8 }}>
+      <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--tp-text-strong)', marginBottom: 8 }}>
         Strategy backtest lab
       </div>
-      <p style={{ fontSize: 12, color: '#64748b', marginBottom: 14, maxWidth: 720, lineHeight: 1.5 }}>
+      <p style={{ fontSize: 12, color: 'var(--tp-text-muted)', marginBottom: 14, maxWidth: 720, lineHeight: 1.5 }}>
         Signals are computed at each bar close using only past data. Fills default to the{' '}
-        <strong style={{ color: '#94a3b8' }}>next bar open</strong> with slippage and commission.
+        <strong style={{ color: 'var(--tp-text-secondary)' }}>next bar open</strong> with slippage and commission.
         Out-of-sample (OOS) metrics use the last portion of history so you can spot overfitting before
-        trusting a strategy. With <strong style={{ color: '#94a3b8' }}>walk-forward</strong> enabled, rolling
+        trusting a strategy. With <strong style={{ color: 'var(--tp-text-secondary)' }}>walk-forward</strong> enabled, rolling
         train/test windows compound capital across folds — the strongest check before live use.
       </p>
 
@@ -54,8 +54,8 @@ export default function BacktestResultsPanel({
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
           gap: 12,
-          background: '#0a0f1e',
-          border: '1px solid #1a2035',
+          background: 'var(--tp-bg-panel)',
+          border: '1px solid var(--tp-border)',
           borderRadius: 12,
           padding: 16,
           marginBottom: 16,
@@ -188,7 +188,7 @@ export default function BacktestResultsPanel({
             ))}
           </select>
         </div>
-        <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #1a2035', paddingTop: 12 }}>
+        <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--tp-border)', paddingTop: 12 }}>
           <label
             style={{
               ...labelStyle,
@@ -197,7 +197,7 @@ export default function BacktestResultsPanel({
               gap: 8,
               textTransform: 'none',
               letterSpacing: 0,
-              color: '#94a3b8',
+              color: 'var(--tp-text-secondary)',
               fontSize: 13,
             }}
           >
@@ -279,11 +279,11 @@ export default function BacktestResultsPanel({
           }}
         >
           <div>
-            <div style={{ color: '#64748b', fontSize: 10, textTransform: 'uppercase' }}>Symbols</div>
+            <div style={{ color: 'var(--tp-text-muted)', fontSize: 10, textTransform: 'uppercase' }}>Symbols</div>
             <strong>{backtestAggregate.numSymbols}</strong>
           </div>
           <div>
-            <div style={{ color: '#64748b', fontSize: 10, textTransform: 'uppercase' }}>Avg return</div>
+            <div style={{ color: 'var(--tp-text-muted)', fontSize: 10, textTransform: 'uppercase' }}>Avg return</div>
             <strong
               style={{
                 color: backtestAggregate.avgReturnPct >= 0 ? '#22c55e' : '#ef4444',
@@ -294,33 +294,33 @@ export default function BacktestResultsPanel({
             </strong>
           </div>
           <div>
-            <div style={{ color: '#64748b', fontSize: 10, textTransform: 'uppercase' }}>Avg CAGR</div>
+            <div style={{ color: 'var(--tp-text-muted)', fontSize: 10, textTransform: 'uppercase' }}>Avg CAGR</div>
             <strong>{backtestAggregate.avgCagrPct.toFixed(2)}%</strong>
           </div>
           <div>
-            <div style={{ color: '#64748b', fontSize: 10, textTransform: 'uppercase' }}>Avg Sharpe</div>
+            <div style={{ color: 'var(--tp-text-muted)', fontSize: 10, textTransform: 'uppercase' }}>Avg Sharpe</div>
             <strong>{backtestAggregate.avgSharpe.toFixed(2)}</strong>
           </div>
           <div>
-            <div style={{ color: '#64748b', fontSize: 10, textTransform: 'uppercase' }}>Beat B&amp;H</div>
+            <div style={{ color: 'var(--tp-text-muted)', fontSize: 10, textTransform: 'uppercase' }}>Beat B&amp;H</div>
             <strong>{backtestAggregate.pctBeatBuyHold.toFixed(0)}%</strong>
           </div>
           <div>
-            <div style={{ color: '#64748b', fontSize: 10, textTransform: 'uppercase' }}>Avg confidence</div>
+            <div style={{ color: 'var(--tp-text-muted)', fontSize: 10, textTransform: 'uppercase' }}>Avg confidence</div>
             <strong>{backtestAggregate.avgConfidence.toFixed(1)}/5</strong>
           </div>
           <div>
-            <div style={{ color: '#64748b', fontSize: 10, textTransform: 'uppercase' }}>Round-trips</div>
+            <div style={{ color: 'var(--tp-text-muted)', fontSize: 10, textTransform: 'uppercase' }}>Round-trips</div>
             <strong>{backtestAggregate.totalTrades}</strong>
           </div>
           {backtestAggregate.avgWfEfficiency != null && (
             <>
               <div>
-                <div style={{ color: '#64748b', fontSize: 10, textTransform: 'uppercase' }}>WF +ve folds</div>
+                <div style={{ color: 'var(--tp-text-muted)', fontSize: 10, textTransform: 'uppercase' }}>WF +ve folds</div>
                 <strong>{backtestAggregate.avgWfEfficiency.toFixed(0)}%</strong>
               </div>
               <div>
-                <div style={{ color: '#64748b', fontSize: 10, textTransform: 'uppercase' }}>Avg WF OOS</div>
+                <div style={{ color: 'var(--tp-text-muted)', fontSize: 10, textTransform: 'uppercase' }}>Avg WF OOS</div>
                 <strong>{backtestAggregate.avgWfCompoundedReturn?.toFixed(2)}%</strong>
               </div>
             </>
@@ -329,15 +329,15 @@ export default function BacktestResultsPanel({
       )}
 
       {backtestMeta && (
-        <p style={{ fontSize: 11, color: '#475569', marginBottom: 12 }}>{backtestMeta}</p>
+        <p style={{ fontSize: 11, color: 'var(--tp-text-faint)', marginBottom: 12 }}>{backtestMeta}</p>
       )}
 
       {backtestSummaries.length > 0 && (
         <>
-          <div style={{ overflow: 'auto', border: '1px solid #1a2035', borderRadius: 12 }}>
+          <div style={{ overflow: 'auto', border: '1px solid var(--tp-border)', borderRadius: 12 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
               <thead>
-                <tr style={{ background: '#060b16' }}>
+                <tr style={{ background: 'var(--tp-bg-input)' }}>
                   {[
                     'Symbol',
                     'Conf.',
@@ -359,9 +359,9 @@ export default function BacktestResultsPanel({
                         textAlign: 'left',
                         padding: '10px 10px',
                         fontSize: 10,
-                        color: '#64748b',
+                        color: 'var(--tp-text-muted)',
                         textTransform: 'uppercase',
-                        borderBottom: '1px solid #1a2035',
+                        borderBottom: '1px solid var(--tp-border)',
                       }}
                     >
                       {h}
@@ -386,7 +386,7 @@ export default function BacktestResultsPanel({
                         cursor: 'pointer',
                       }}
                     >
-                      <td style={{ padding: '10px 10px', fontWeight: 700, color: '#f8fafc' }}>
+                      <td style={{ padding: '10px 10px', fontWeight: 700, color: 'var(--tp-text-strong)' }}>
                         {row.symbol}
                       </td>
                       <td
@@ -398,7 +398,7 @@ export default function BacktestResultsPanel({
                       >
                         {st ? conf.toFixed(1) : '—'}
                       </td>
-                      <td style={{ padding: '10px 10px', color: '#94a3b8' }}>
+                      <td style={{ padding: '10px 10px', color: 'var(--tp-text-secondary)' }}>
                         {st ? st.numTrades : '—'}
                       </td>
                       <td
@@ -493,9 +493,9 @@ export default function BacktestResultsPanel({
               style={{
                 marginTop: 16,
                 padding: 16,
-                border: '1px solid #1a2035',
+                border: '1px solid var(--tp-border)',
                 borderRadius: 12,
-                background: '#0a0f1e',
+                background: 'var(--tp-bg-panel)',
               }}
             >
               <BacktestEquityChart
@@ -506,7 +506,7 @@ export default function BacktestResultsPanel({
                 initialCapital={selected.stats.initialCapital}
               />
               {selected.confidence?.notes?.length > 0 && (
-                <ul style={{ margin: '12px 0 0', paddingLeft: 18, fontSize: 12, color: '#94a3b8' }}>
+                <ul style={{ margin: '12px 0 0', paddingLeft: 18, fontSize: 12, color: 'var(--tp-text-secondary)' }}>
                   {selected.confidence.notes.map((n) => (
                     <li key={n}>{n}</li>
                   ))}
@@ -520,7 +520,7 @@ export default function BacktestResultsPanel({
                   marginTop: 14,
                   fontSize: 11,
                   fontFamily: 'ui-monospace, monospace',
-                  color: '#64748b',
+                  color: 'var(--tp-text-muted)',
                 }}
               >
                 <span>Expectancy ${selected.stats.expectancy.toFixed(2)}/trade</span>
@@ -552,17 +552,17 @@ export default function BacktestResultsPanel({
                   <div style={{ fontSize: 12, fontWeight: 700, color: '#cbd5e1', marginBottom: 8 }}>
                     Walk-forward folds
                   </div>
-                  <div style={{ overflow: 'auto', maxHeight: 220, border: '1px solid #1a2035', borderRadius: 8 }}>
+                  <div style={{ overflow: 'auto', maxHeight: 220, border: '1px solid var(--tp-border)', borderRadius: 8 }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                       <thead>
-                        <tr style={{ background: '#060b16' }}>
+                        <tr style={{ background: 'var(--tp-bg-input)' }}>
                           {['#', 'Test from', 'Test to', 'IS ret%', 'OOS ret%', 'OOS tr', 'End $'].map((h) => (
                             <th
                               key={h}
                               style={{
                                 textAlign: 'left',
                                 padding: '6px 8px',
-                                color: '#64748b',
+                                color: 'var(--tp-text-muted)',
                                 fontSize: 9,
                                 textTransform: 'uppercase',
                               }}
@@ -575,7 +575,7 @@ export default function BacktestResultsPanel({
                       <tbody>
                         {selected.walkForward.folds.map((f) => (
                           <tr key={f.index} style={{ borderTop: '1px solid #0f1424' }}>
-                            <td style={{ padding: '6px 8px', color: '#94a3b8' }}>{f.index + 1}</td>
+                            <td style={{ padding: '6px 8px', color: 'var(--tp-text-secondary)' }}>{f.index + 1}</td>
                             <td style={{ padding: '6px 8px', fontFamily: 'ui-monospace, monospace' }}>
                               {f.testFromTime || f.testFrom}
                             </td>
@@ -620,8 +620,8 @@ export default function BacktestResultsPanel({
                 padding: '8px 14px',
                 borderRadius: 8,
                 border: '1px solid #334155',
-                background: '#0f172a',
-                color: '#e2e8f0',
+                background: 'var(--tp-bg-sidebar)',
+                color: 'var(--tp-text)',
                 fontSize: 12,
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -630,7 +630,7 @@ export default function BacktestResultsPanel({
               Export backtest CSV
             </button>
             {backtestTrades.length > 0 && (
-              <span style={{ fontSize: 11, color: '#64748b' }}>
+              <span style={{ fontSize: 11, color: 'var(--tp-text-muted)' }}>
                 {backtestTrades.length} trade rows (summary + trades files)
               </span>
             )}

@@ -1,9 +1,14 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { RESEARCH_DATA_IMPORTED_EVENT } from './utils/dataBackup';
+import FilterCombo from './components/FilterCombo';
+import MultiFilterCombo from './components/MultiFilterCombo';
+import { buildWatchlistFilterSuggestions } from './utils/screenerFilterSuggestions';
+import { parseTags } from './utils/customRank';
 import { dispatchWatchlistChanged } from './utils/liveSubscribe';
 import { displayChangePct, displayPrice, quoteForSymbol } from './utils/quoteDisplay';
 import { applyResolvedToWatchlistForm } from './utils/watchlistAutoFill';
 import { resolveSymbolForTerminal } from './utils/resolveSymbolContract';
+import { formatSectorDisplay } from './utils/sectorDisplay';
 
 function Watchlist({ quotes = {}, onSelectSymbol }) {
   const loadStocks = () => {
@@ -95,10 +100,10 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
   const priorityColor = (p) => p === 'High' ? '#ef4444' : p === 'Medium' ? '#f59e0b' : '#22c55e';
 
   const inputStyle = {
-    background: '#060b16',
-    border: '1px solid #1a2035',
+    background: 'var(--tp-bg-input)',
+    border: '1px solid var(--tp-border)',
     borderRadius: 8,
-    color: '#f1f5f9',
+    color: 'var(--tp-text-title)',
     fontSize: 13,
     padding: '8px 12px',
     width: '100%',
@@ -108,7 +113,7 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
 
   const labelStyle = {
     fontSize: 11,
-    color: '#475569',
+    color: 'var(--tp-text-faint)',
     textTransform: 'uppercase',
     letterSpacing: '0.1em',
     marginBottom: 6,
@@ -121,15 +126,19 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
     return () => window.removeEventListener(RESEARCH_DATA_IMPORTED_EVENT, reload);
   }, []);
 
+  const filterSuggestions = useMemo(() => buildWatchlistFilterSuggestions(stocks), [stocks]);
+
+  const tagList = useMemo(() => parseTags(form.tags), [form.tags]);
+
   return (
     <div>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <div style={{ fontSize: 11, color: '#334155', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 4 }}>
+          <div style={{ fontSize: 11, color: 'var(--tp-text-dim)', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: 4 }}>
             Stocks to Watch
           </div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: '#f8fafc', letterSpacing: '-0.02em' }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--tp-text-strong)', letterSpacing: '-0.02em' }}>
             Watchlist
           </div>
         </div>
@@ -161,12 +170,12 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
           { label: 'Low Priority', value: stocks.filter(s => s.priority === 'Low').length, color: '#22c55e' },
         ].map((s, i) => (
           <div key={i} style={{
-            background: '#0a0f1e',
-            border: '1px solid #1a2035',
+            background: 'var(--tp-bg-panel)',
+            border: '1px solid var(--tp-border)',
             borderRadius: 10,
             padding: '16px 18px',
           }}>
-            <div style={{ fontSize: 11, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>{s.label}</div>
+            <div style={{ fontSize: 11, color: 'var(--tp-text-faint)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>{s.label}</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: s.color || '#f1f5f9' }}>{s.value}</div>
           </div>
         ))}
@@ -175,61 +184,72 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
       {/* Add Stock Form */}
       {showForm && (
         <div style={{
-          background: '#0a0f1e',
-          border: '1px solid #1a2035',
+          background: 'var(--tp-bg-panel)',
+          border: '1px solid var(--tp-border)',
           borderRadius: 12,
           padding: 24,
           marginBottom: 24,
         }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#f1f5f9', marginBottom: 20 }}>Add Stock to Watchlist</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--tp-text-title)', marginBottom: 20 }}>Add Stock to Watchlist</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 16 }}>
-            <div>
-              <label style={labelStyle}>Ticker</label>
-              <input
-                placeholder="e.g. ULVR.L"
-                value={form.ticker}
-                onChange={(e) => handleChange('ticker', e.target.value.toUpperCase())}
-                onBlur={(e) => lookupTicker(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    lookupTicker(form.ticker);
-                  }
-                }}
-                style={inputStyle}
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>Company Name</label>
-              <input placeholder="e.g. Unilever" value={form.name} onChange={e => handleChange('name', e.target.value)} style={inputStyle} />
-            </div>
-            <div>
-              <label style={labelStyle}>Sector</label>
-              <select value={form.sector} onChange={e => handleChange('sector', e.target.value)} style={inputStyle}>
-                <option value="">Select sector</option>
-                <option>Consumer Staples</option>
-                <option>Technology</option>
-                <option>Energy</option>
-                <option>Financial Services</option>
-                <option>Healthcare</option>
-                <option>Real Estate</option>
-                <option>Industrials</option>
-                <option>Materials</option>
-                <option>Utilities</option>
-              </select>
-            </div>
+            <FilterCombo
+              label="Ticker"
+              labelStyle={labelStyle}
+              inputStyle={inputStyle}
+              placeholder="e.g. ULVR.L"
+              value={form.ticker}
+              onChange={(v) => handleChange('ticker', v.toUpperCase())}
+              onBlur={() => lookupTicker(form.ticker)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  lookupTicker(form.ticker);
+                }
+              }}
+              options={filterSuggestions.tickers}
+              emptyLabel="Enter new ticker"
+            />
+            <FilterCombo
+              label="Company name"
+              labelStyle={labelStyle}
+              inputStyle={inputStyle}
+              placeholder="e.g. Unilever"
+              value={form.name}
+              onChange={(v) => handleChange('name', v)}
+              options={filterSuggestions.names}
+            />
+            <FilterCombo
+              label="Sector"
+              labelStyle={labelStyle}
+              inputStyle={inputStyle}
+              placeholder="Pick or type sector"
+              value={form.sector}
+              onChange={(v) => handleChange('sector', v)}
+              options={filterSuggestions.sectors}
+              emptyLabel="Clear sector"
+            />
             <div>
               <label style={labelStyle}>Target buy price</label>
               <input type="number" placeholder="Auto from FMP if empty" value={form.buyPrice} onChange={e => handleChange('buyPrice', e.target.value)} style={inputStyle} />
             </div>
-            <div>
-              <label style={labelStyle}>Exchange (IB)</label>
-              <input placeholder="SMART or LSE" value={form.exchange} onChange={e => handleChange('exchange', e.target.value.toUpperCase())} style={inputStyle} />
-            </div>
-            <div>
-              <label style={labelStyle}>Currency</label>
-              <input placeholder="USD / GBP" value={form.currency} onChange={e => handleChange('currency', e.target.value.toUpperCase())} style={inputStyle} />
-            </div>
+            <FilterCombo
+              label="Exchange (IB)"
+              labelStyle={labelStyle}
+              inputStyle={inputStyle}
+              placeholder="SMART or LSE"
+              value={form.exchange}
+              onChange={(v) => handleChange('exchange', v.toUpperCase())}
+              options={filterSuggestions.exchanges}
+            />
+            <FilterCombo
+              label="Currency"
+              labelStyle={labelStyle}
+              inputStyle={inputStyle}
+              placeholder="USD / GBP"
+              value={form.currency}
+              onChange={(v) => handleChange('currency', v.toUpperCase())}
+              options={filterSuggestions.currencies}
+            />
             <div>
               <label style={labelStyle}>Priority</label>
               <select value={form.priority} onChange={e => handleChange('priority', e.target.value)} style={inputStyle}>
@@ -238,10 +258,15 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
                 <option>Low</option>
               </select>
             </div>
-            <div>
-              <label style={labelStyle}>Tags</label>
-              <input placeholder="thesis, dividend (comma-separated)" value={form.tags} onChange={e => handleChange('tags', e.target.value)} style={inputStyle} />
-            </div>
+            <MultiFilterCombo
+              label="Tags"
+              labelStyle={labelStyle}
+              inputStyle={inputStyle}
+              placeholder="thesis, dividend…"
+              selected={tagList}
+              onChange={(arr) => handleChange('tags', arr.join(', '))}
+              options={filterSuggestions.tags}
+            />
           </div>
           <div style={{ marginBottom: 16 }}>
             <label style={labelStyle}>Notes</label>
@@ -281,15 +306,15 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
       {/* Watchlist */}
       {stocks.length === 0 ? (
         <div style={{
-          background: '#0a0f1e',
-          border: '1px solid #1a2035',
+          background: 'var(--tp-bg-panel)',
+          border: '1px solid var(--tp-border)',
           borderRadius: 12,
           padding: 48,
           textAlign: 'center',
-          color: '#334155',
+          color: 'var(--tp-text-dim)',
         }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>◉</div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: '#475569', marginBottom: 6 }}>No stocks on your watchlist</div>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--tp-text-faint)', marginBottom: 6 }}>No stocks on your watchlist</div>
           <div style={{ fontSize: 13 }}>Click "Add Stock" to start watching</div>
         </div>
       ) : (
@@ -301,8 +326,8 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
             const chg = displayChangePct(q);
             return (
             <div key={stock.id} style={{
-              background: '#0a0f1e',
-              border: '1px solid #1a2035',
+              background: 'var(--tp-bg-panel)',
+              border: '1px solid var(--tp-border)',
               borderRadius: 12,
               padding: '16px 20px',
               display: 'flex',
@@ -321,13 +346,13 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
                 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: '#f1f5f9' }}>{stock.ticker}</span>
-                    {stock.name && <span style={{ fontSize: 13, color: '#475569' }}>{stock.name}</span>}
+                    <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--tp-text-title)' }}>{stock.ticker}</span>
+                    {stock.name && <span style={{ fontSize: 13, color: 'var(--tp-text-faint)' }}>{stock.name}</span>}
                     {stock.sector && (
                       <span style={{
                         fontSize: 11, padding: '2px 8px', borderRadius: 4,
-                        background: '#1a2035', color: '#64748b', fontWeight: 500,
-                      }}>{stock.sector}</span>
+                        background: 'var(--tp-bg-active)', color: 'var(--tp-text-muted)', fontWeight: 500,
+                      }}>{formatSectorDisplay(stock.sector)}</span>
                     )}
                     <span style={{
                       fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 600,
@@ -342,13 +367,13 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
                   </div>
                   <div style={{ display: 'flex', gap: 20, marginBottom: stock.notes ? 8 : 0 }}>
                     {stock.buyPrice && (
-                      <div style={{ fontSize: 12, color: '#475569' }}>
+                      <div style={{ fontSize: 12, color: 'var(--tp-text-faint)' }}>
                         Target: <span style={{ color: '#22c55e', fontWeight: 600 }}>£{stock.buyPrice}</span>
                       </div>
                     )}
                     {px != null && (
-                      <div style={{ fontSize: 12, color: '#94a3b8' }}>
-                        Last: <span style={{ color: '#f1f5f9', fontWeight: 600 }}>{px.toFixed(2)}</span>
+                      <div style={{ fontSize: 12, color: 'var(--tp-text-secondary)' }}>
+                        Last: <span style={{ color: 'var(--tp-text-title)', fontWeight: 600 }}>{px.toFixed(2)}</span>
                         {chg != null && (
                           <span style={{ marginLeft: 8, color: chg >= 0 ? '#22c55e' : '#ef4444' }}>
                             {chg >= 0 ? '+' : ''}{chg.toFixed(2)}%
@@ -356,10 +381,10 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
                         )}
                       </div>
                     )}
-                    <div style={{ fontSize: 12, color: '#334155' }}>Added: {stock.addedDate}</div>
+                    <div style={{ fontSize: 12, color: 'var(--tp-text-dim)' }}>Added: {stock.addedDate}</div>
                   </div>
                   {stock.notes && (
-                    <div style={{ fontSize: 12, color: '#475569', lineHeight: 1.5 }}>{stock.notes}</div>
+                    <div style={{ fontSize: 12, color: 'var(--tp-text-faint)', lineHeight: 1.5 }}>{stock.notes}</div>
                   )}
                 </div>
               </div>
@@ -372,7 +397,7 @@ function Watchlist({ quotes = {}, onSelectSymbol }) {
                   }}>Terminal</button>
                 )}
               <button onClick={() => handleDelete(stock.id)} style={{
-                padding: '4px 10px', borderRadius: 5, border: '1px solid #1a2035',
+                padding: '4px 10px', borderRadius: 5, border: '1px solid var(--tp-border)',
                 background: 'transparent', color: '#ef4444', fontSize: 11,
                 cursor: 'pointer', fontWeight: 600, flexShrink: 0,
               }}>Remove</button>

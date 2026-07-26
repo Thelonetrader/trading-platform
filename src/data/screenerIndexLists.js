@@ -17,6 +17,8 @@ export const SP50_SAMPLE_TICKERS = [
 ];
 
 export const UNIVERSE_OPTIONS = [
+  { id: 'live', label: 'Live market (FMP screener)' },
+  { id: 'global', label: 'Everything (local + symbol search)' },
   { id: 'watchlist', label: 'Watchlist only' },
   { id: 'combined', label: 'Watchlist + library + portfolio' },
   { id: 'library', label: 'Scorecard library' },

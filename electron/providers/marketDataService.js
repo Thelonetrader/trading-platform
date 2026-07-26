@@ -74,6 +74,8 @@ function createService() {
     getNews: (opts) => fmp.getNews(opts),
     getEarningsCalendar: (opts) => fmp.getEarningsCalendar(opts),
     getScreenerSnapshots: (tickers) => fmp.getScreenerSnapshots(tickers),
+    searchSymbols: (query, opts) => fmp.searchSymbols(query, opts),
+    companyScreener: (params) => fmp.companyScreener(params),
   };
 }
 

@@ -1,6 +1,12 @@
 import { readJson } from './storageStats';
 import { parseTags } from './customRank';
 import { displayChangePct, displayPrice, quoteForSymbol } from './quoteDisplay';
+import { matchesAnyContains, matchesAnyTag, normalizeFilterList } from './filterChipLists';
+import {
+  effectiveAlertLiveFilters,
+  matchesAnyPriceBand,
+  ruleHasLiveFilters,
+} from './screenerQuickFilters';
 
 export const ALERT_RULES_KEY = 'alertRules';
 
@@ -30,8 +36,10 @@ export function upsertAlertRule(rule) {
     priorities: rule.priorities?.length ? rule.priorities : ['High', 'Medium', 'Low'],
     requireJournal: !!rule.requireJournal,
     requireScorecard: !!rule.requireScorecard,
-    tagMatch: (rule.tagMatch || '').trim().toLowerCase(),
-    sectorContains: (rule.sectorContains || '').trim().toLowerCase(),
+    tagMatches: normalizeFilterList(rule.tagMatches, rule.tagMatch),
+    sectorMatches: normalizeFilterList(rule.sectorMatches, rule.sectorContains),
+    dayChangeChipIds: normalizeFilterList(rule.dayChangeChipIds),
+    priceBandIds: normalizeFilterList(rule.priceBandIds),
     minDayChangePct: rule.minDayChangePct === '' || rule.minDayChangePct == null ? null : Number(rule.minDayChangePct),
     maxDayChangePct: rule.maxDayChangePct === '' || rule.maxDayChangePct == null ? null : Number(rule.maxDayChangePct),
     minPrice: rule.minPrice === '' || rule.minPrice == null ? null : Number(rule.minPrice),
@@ -53,13 +61,16 @@ export function evaluateRule(rule, ctx) {
   if (!rule.enabled) return false;
   if (!ctx.watch) return false;
 
+  const sectorMatches = normalizeFilterList(rule.sectorMatches, rule.sectorContains);
+  const tagMatches = normalizeFilterList(rule.tagMatches, rule.tagMatch);
+
   if (!rule.priorities.includes(ctx.watch.priority || 'Medium')) return false;
 
   const sector = (ctx.watch.sector || '').toLowerCase();
-  if (rule.sectorContains && !sector.includes(rule.sectorContains)) return false;
+  if (!matchesAnyContains(sector, sectorMatches)) return false;
 
   const tags = ctx.tags || parseTags(ctx.watch.tags);
-  if (rule.tagMatch && !tags.some((t) => t.toLowerCase().includes(rule.tagMatch))) return false;
+  if (!matchesAnyTag(tags, tagMatches)) return false;
 
   if (rule.requireJournal && !ctx.journal) return false;
   if (rule.requireScorecard && !ctx.eval) return false;
@@ -69,21 +80,22 @@ export function evaluateRule(rule, ctx) {
     if (!ctx.eval || ctx.eval.avg < minAvg) return false;
   }
 
-  const needsQuote =
-    rule.minDayChangePct != null ||
-    rule.maxDayChangePct != null ||
-    rule.minPrice != null ||
-    rule.maxPrice != null ||
-    rule.minPctAboveBuy != null;
+  const live = effectiveAlertLiveFilters(rule);
+  const priceBandIds = normalizeFilterList(rule.priceBandIds);
+
+  const needsQuote = ruleHasLiveFilters(rule);
 
   if (needsQuote) {
     const q = ctx.quote;
     const price = displayPrice(q);
     const chg = displayChangePct(q);
-    if (rule.minDayChangePct != null && (chg == null || chg < rule.minDayChangePct)) return false;
-    if (rule.maxDayChangePct != null && (chg == null || chg > rule.maxDayChangePct)) return false;
-    if (rule.minPrice != null && (price == null || price < rule.minPrice)) return false;
-    if (rule.maxPrice != null && (price == null || price > rule.maxPrice)) return false;
+    if (live.minDayChangePct != null && (chg == null || chg < live.minDayChangePct)) return false;
+    if (live.maxDayChangePct != null && (chg == null || chg > live.maxDayChangePct)) return false;
+
+    const priceBand = matchesAnyPriceBand(price, priceBandIds);
+    if (priceBand === false) return false;
+    if (live.minPrice != null && (price == null || price < live.minPrice)) return false;
+    if (live.maxPrice != null && (price == null || price > live.maxPrice)) return false;
     if (rule.minPctAboveBuy != null) {
       const buy = parseFloat(ctx.watch?.buyPrice);
       if (!Number.isFinite(buy) || buy <= 0 || price == null) return false;
@@ -118,8 +130,10 @@ export const DEFAULT_RULE_TEMPLATE = {
   priorities: ['High', 'Medium'],
   requireJournal: false,
   requireScorecard: true,
-  tagMatch: '',
-  sectorContains: '',
+  tagMatches: [],
+  sectorMatches: [],
+  dayChangeChipIds: [],
+  priceBandIds: [],
   minDayChangePct: null,
   maxDayChangePct: null,
   minPrice: null,

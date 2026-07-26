@@ -42,6 +42,8 @@ contextBridge.exposeInMainWorld('marketData', {
   getNews: (opts) => ipcRenderer.invoke('marketData:getNews', opts),
   getEarningsCalendar: (opts) => ipcRenderer.invoke('marketData:getEarningsCalendar', opts),
   getScreenerSnapshots: (tickers) => ipcRenderer.invoke('marketData:getScreenerSnapshots', tickers),
+  searchSymbols: (query, opts) => ipcRenderer.invoke('marketData:searchSymbols', query, opts),
+  companyScreener: (params) => ipcRenderer.invoke('marketData:companyScreener', params),
 });
 
 contextBridge.exposeInMainWorld('agent', {

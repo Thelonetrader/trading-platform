@@ -6,9 +6,10 @@ import {
   fmtMktCap,
   mergedMetrics,
   rowLastPrice,
-  rowMarketCap,
+  rowMarketCapUsd,
   rowSnapshot,
 } from '../utils/screenerFilters';
+import { listingCurrency } from '../utils/fxUsd';
 
 const COL = {
   sym: 108,
@@ -35,16 +36,16 @@ function Th({ children, align = 'left', w }) {
         padding: '8px 10px',
         fontSize: 10,
         fontWeight: 700,
-        color: '#64748b',
+        color: 'var(--tp-text-muted)',
         textTransform: 'uppercase',
         letterSpacing: '0.08em',
-        borderBottom: '1px solid #1a2035',
+        borderBottom: '1px solid var(--tp-border)',
         width: w,
         minWidth: w,
         position: 'sticky',
         top: 0,
-        background: '#060b16',
-        zIndex: 1,
+        background: 'var(--tp-bg-input)',
+        zIndex: 0,
       }}
     >
       {children}
@@ -58,11 +59,11 @@ function Td({ children, align = 'left', mono, color }) {
       style={{
         padding: '10px 10px',
         fontSize: 12,
-        color: color || '#cbd5e1',
+        color: color || 'var(--tp-text-secondary)',
         textAlign: align,
         fontVariantNumeric: mono ? 'tabular-nums' : undefined,
         fontFamily: mono ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : undefined,
-        borderBottom: '1px solid #0f1424',
+        borderBottom: '1px solid var(--tp-border-subtle, var(--tp-border))',
         whiteSpace: 'nowrap',
       }}
     >
@@ -75,8 +76,8 @@ export default function ScreenerTable({ rows, quotes, snapshots, connection, onO
   return (
     <div
       style={{
-        background: '#0a0f1e',
-        border: '1px solid #1a2035',
+        background: 'var(--tp-bg-panel)',
+        border: '1px solid var(--tp-border)',
         borderRadius: 12,
         overflow: 'auto',
         maxHeight: 'calc(100vh - 320px)',
@@ -100,7 +101,7 @@ export default function ScreenerTable({ rows, quotes, snapshots, connection, onO
               Ask
             </Th>
             <Th align="right" w={COL.mcap}>
-              Mkt cap
+              Mkt cap (USD)
             </Th>
             <Th align="right" w={COL.pe}>
               P/E
@@ -130,11 +131,12 @@ export default function ScreenerTable({ rows, quotes, snapshots, connection, onO
             const metrics = mergedMetrics(row, snap);
             const px = rowLastPrice(quote, snap);
             const ch = displayChangePct(quote);
-            const mcap = rowMarketCap(row, snap, quote);
+            const mcap = rowMarketCapUsd(row, snap, quote);
+            const ccy = listingCurrency(snap, row);
             const sectorMeta = row.eval?.sectorId ? SECTORS[row.eval.sectorId] : null;
             const accent = sectorMeta?.accent || '#6366f1';
             const avg = row.eval?.avg;
-            const ratingColor = avg != null ? getRatingColor(avg, accent) : '#334155';
+            const ratingColor = avg != null ? getRatingColor(avg, accent) : 'var(--tp-text-dim)';
             const priColor = row.priority === 'High' ? '#ef4444' : row.priority === 'Medium' ? '#f59e0b' : '#22c55e';
             const live = connection?.status === 'connected' && quote?.updatedAt;
             const name = row.name || snap?.profile?.companyName || row.sectorLabel || '—';
@@ -142,18 +144,18 @@ export default function ScreenerTable({ rows, quotes, snapshots, connection, onO
             return (
               <tr
                 key={row.id}
-                style={{ background: '#0a0f1e' }}
+                style={{ background: 'var(--tp-bg-panel)' }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#0d1220';
+                  e.currentTarget.style.background = 'var(--tp-bg-hover)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#0a0f1e';
+                  e.currentTarget.style.background = 'var(--tp-bg-panel)';
                 }}
               >
-                <Td mono color="#f8fafc">
+                <Td mono color="var(--tp-text-strong)">
                   <span style={{ fontWeight: 700 }}>{row.ticker}</span>
                   {!row.onWatchlist && (
-                    <span style={{ marginLeft: 6, fontSize: 9, color: '#475569' }}>ext</span>
+                    <span style={{ marginLeft: 6, fontSize: 9, color: 'var(--tp-text-faint)' }}>ext</span>
                   )}
                   {live && (
                     <span style={{ marginLeft: 4, fontSize: 8, color: '#22c55e' }} title="IB tick">
@@ -177,22 +179,25 @@ export default function ScreenerTable({ rows, quotes, snapshots, connection, onO
                 <Td align="right" mono>
                   {px != null ? px.toFixed(2) : '—'}
                 </Td>
-                <Td align="right" mono color={ch == null ? '#475569' : ch >= 0 ? '#22c55e' : '#ef4444'}>
+                <Td align="right" mono color={ch == null ? 'var(--tp-text-dim)' : ch >= 0 ? '#22c55e' : '#ef4444'}>
                   {ch != null ? `${ch >= 0 ? '+' : ''}${ch.toFixed(2)}%` : '—'}
                 </Td>
-                <Td align="right" mono color="#94a3b8">
+                <Td align="right" mono color="var(--tp-text-muted)">
                   {quote?.bid > 0 ? quote.bid.toFixed(2) : '—'}
                 </Td>
-                <Td align="right" mono color="#94a3b8">
+                <Td align="right" mono color="var(--tp-text-muted)">
                   {quote?.ask > 0 ? quote.ask.toFixed(2) : '—'}
                 </Td>
-                <Td align="right" mono>
+                <Td align="right" mono title={ccy !== 'USD' ? `Listing: ${ccy}` : undefined}>
                   {fmtMktCap(mcap)}
+                  {ccy !== 'USD' && mcap != null && (
+                    <span style={{ marginLeft: 4, fontSize: 9, color: 'var(--tp-text-faint)' }}>{ccy}</span>
+                  )}
                 </Td>
                 <Td align="right" mono>
                   {fmtMetric(metrics.forwardPE, 1)}
                 </Td>
-                <Td align="right" mono color={metrics.epsGrowth >= 0 ? '#94a3b8' : '#f97316'}>
+                <Td align="right" mono color={metrics.epsGrowth >= 0 ? 'var(--tp-text-muted)' : '#f97316'}>
                   {metrics.epsGrowth != null ? `${fmtMetric(metrics.epsGrowth, 1)}%` : '—'}
                 </Td>
                 <Td align="right" mono>
@@ -202,13 +207,13 @@ export default function ScreenerTable({ rows, quotes, snapshots, connection, onO
                   {row.eval ? (
                     <>
                       <span style={{ fontWeight: 700, color: ratingColor }}>{row.eval.ratingShort}</span>
-                      <span style={{ marginLeft: 6, fontSize: 11, color: '#475569' }}>{row.eval.avg.toFixed(2)}</span>
+                      <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--tp-text-faint)' }}>{row.eval.avg.toFixed(2)}</span>
                     </>
                   ) : (
-                    <span style={{ color: '#334155' }}>—</span>
+                    <span style={{ color: 'var(--tp-text-dim)' }}>—</span>
                   )}
                 </Td>
-                <Td align="right" mono color="#818cf8">
+                <Td align="right" mono color="var(--tp-accent)">
                   {row.customRank}
                 </Td>
                 <Td color={priColor}>{row.priority.slice(0, 1)}</Td>
@@ -239,7 +244,7 @@ const btnPrimary = {
   padding: '4px 10px',
   borderRadius: 6,
   border: 'none',
-  background: '#6366f1',
+  background: 'var(--tp-accent)',
   color: '#fff',
   fontSize: 11,
   fontWeight: 600,
@@ -249,9 +254,9 @@ const btnPrimary = {
 const btnGhost = {
   padding: '4px 10px',
   borderRadius: 6,
-  border: '1px solid #1a2035',
+  border: '1px solid var(--tp-border)',
   background: 'transparent',
-  color: '#94a3b8',
+  color: 'var(--tp-text-secondary)',
   fontSize: 11,
   fontWeight: 600,
   cursor: 'pointer',
